@@ -3,61 +3,19 @@ import cv2
 import numpy as np
 from icdar import generator
 
-# init model
-layers = [174, 142, 80, 12]
-resnet = tf.keras.applications.ResNet50(include_top=False, input_shape=(480, 640, 3))
-resnet_layers = tf.keras.models.Model(inputs=resnet.input, outputs=[resnet.get_layer(index=i).output for i in layers])
-
-names = [i.name for i in resnet.layers]
-[names.index(i) for i in layers]
-
-# input
-image = cv2.imread('test_images/1_pontifically_58805.jpg', 3)
-image = cv2.resize(image, (512, 512), interpolation=cv2.INTER_LINEAR)
-
-# preprocess
-x = tf.keras.applications.resnet50.preprocess_input(image)
-x = x[np.newaxis, :, :]
-
-# ------- #
-f = resnet_layers(x)
-g = [None, None, None, None]
-h = [None, None, None, None]
-num_outputs = [None, 128, 64, 32]
-for i in range(4):
-    if i == 0:
-        h[i] = f[i]
-    else:
-        c1_1 = tf.keras.layers.Conv2D(filters=num_outputs[i], kernel_size=1, padding='same', activation=tf.nn.relu)(tf.concat([g[i - 1], f[i]], axis=-1))
-        h[i] = tf.keras.layers.Conv2D(filters=num_outputs[i], kernel_size=3, padding='same', activation=tf.nn.relu)(c1_1)
-    if i <= 2:
-        g[i] = tf.image.resize(h[i], size=[tf.shape(h[i])[1]*2,  tf.shape(h[i])[2]*2])
-    else:
-        g[i] = tf.keras.layers.Conv2D(filters=num_outputs[i], kernel_size=3, padding='same', activation=tf.nn.relu)(h[i])
-    print('Shape of h_{} {}, g_{} {}'.format(i, h[i].shape, i, g[i].shape))
-
 
 class SharedConv(tf.keras.Model):
 
-    """
-    res_1 = self.resnet.layers[174].output
-    res_2 = self.resnet.layers[142].output
-    res_3 = self.resnet.layers[80].output
-    res_4 = self.resnet.layers[12].output
-
-    """
-
-    def __init__(self, input_shape=(360, 360, 3)):
+    def __init__(self, input_shape=(480, 640, 3)):
         super(SharedConv, self).__init__()
 
         self.resnet = tf.keras.applications.ResNet50(include_top=False, input_shape=input_shape)
         self.resnet.trainable = False
-        self.inner_layers = [174, 142, 80, 12]
-        print([i.name for i in self.resnet.layers])
-        self.resnet_layers = tf.keras.models.Model(inputs=self.resnet.input,
-                                                   outputs=[self.resnet.get_layer(index=i).output for i in self.inner_layers])
+        self.layer_ids = [174, 142, 80, 12]
+        self.resnet_layers = tf.keras.models.Model(
+            inputs=self.resnet.input,
+            outputs=[self.resnet.get_layer(index=i).output for i in self.layer_ids])
 
-        # concatinating resnet layers
         self.l1 = tf.keras.layers.Conv2D(filters=128, kernel_size=1, padding='same', activation=tf.nn.relu)
         self.l2 = tf.keras.layers.Conv2D(filters=64, kernel_size=1, padding='same', activation=tf.nn.relu)
         self.l3 = tf.keras.layers.Conv2D(filters=32, kernel_size=1, padding='same', activation=tf.nn.relu)
@@ -68,73 +26,112 @@ class SharedConv(tf.keras.Model):
 
         self.g1 = tf.keras.layers.Conv2D(filters=32, kernel_size=3, padding='same', activation=tf.nn.relu)
 
-        # f scores and geometry
+    def call(self, input):
+
+        """
+        Example of what is actually happening here.
+        No loop for it makes it easier to understand.
+        We are extracting 4 different layers from ResNet50.
+        Dims will depend on the input size, but the relative
+        sizes will stay the same and that is what matters.
+
+        input       [1, 480, 640, 3]
+        layer_1     [1, 15, 20, 2048]   (one of the last layers, 174th op in the model)
+        layer_2     [1, 30, 40, 1024]   (142)
+        layer_3     [1, 60, 80, 512]    (80)
+        layer_4     [1, 120, 160, 64]   (one of the first layers, 12th op in the model)
+
+        step 1: double the size of layer_1 -> [1, 30, 40, 2048]
+
+        step 2: concat layer_1 [1, 30, 40, 2048] and layer_2 [1, 30, 40, 1024] -> [1, 30, 40, 3072]
+                conv with stride 1 to -> [1, 30, 40, 128] this is just to decrease the num of filters (last dim)
+                conv with stride 3 to -> [1, 30, 40, 128]
+                double the size of this layer -> [1, 60, 80, 128]
+
+        step 3: [1, 60, 80, 128] + [1, 60, 80, 512] -> [1, 60, 80, 640]
+                conv to -> [1, 60, 80, 64]
+                conv to -> [1, 60, 80, 64]
+                resize  -> [1, 120, 160, 64]
+
+        step 4: [1, 120, 160, 64] + [1, 120, 160, 64] -> [1, 120, 160, 128]
+                conv to -> [1, 120, 160, 32]
+                conv to -> [1, 120, 160, 32]
+                conv to -> [1, 120, 160, 32]
+
+        """
+
+        # layers extracted from Resnet:
+        # 1st is the farthest one (near the end of the net),
+        # 4th is the closest one (near the beggining)
+        layer_1, layer_2, layer_3, layer_4 = self.resnet_layers(input)
+
+        # step 1
+        # layer_1 -> layer_1
+        layer_shape = tf.shape(layer_1)
+        layer_1 = tf.image.resize(layer_1, size=[layer_shape[1] * 2, layer_shape[2] * 2])
+
+        # step 2
+        # layer_1 + layer_2 -> layer_12
+        layer_12_conc = self.l1(tf.concat([layer_1, layer_2], axis=-1))
+        layer_12_conv = self.h1(layer_12_conc)
+        layer_shape = tf.shape(layer_2)
+        layer_12 = tf.image.resize(layer_12_conv, size=[layer_shape[1] * 2, layer_shape[2] * 2])
+
+        # step 3
+        # layer_12 + layer_3 -> layer_123
+        layer_123_conc = self.l2(tf.concat([layer_12, layer_3], axis=-1))
+        layer_123_conv = self.h2(layer_123_conc)
+        layer_shape = tf.shape(layer_3)
+        layer_123 = tf.image.resize(layer_123_conv, size=[layer_shape[1] * 2, layer_shape[2] * 2])
+
+        # step 4
+        # layer_123 + layer_4 -> layer_1234
+        layer_1234_conc = self.l3(tf.concat([layer_123, layer_4], axis=-1))
+        layer_1234_conv = self.h3(layer_1234_conc)
+        layer_1234 = self.g1(layer_1234_conv)
+
+        return layer_1234
+
+
+class DetectionModel(tf.keras.Model):
+
+    def __init__(self):
+        super(DetectionModel, self).__init__()
+
         self.f_score = tf.keras.layers.Conv2D(filters=1, kernel_size=1, padding='same', activation=tf.nn.sigmoid)
         self.geo_map = tf.keras.layers.Conv2D(filters=4, kernel_size=1, padding='same', activation=tf.nn.sigmoid)
         self.angle_map = tf.keras.layers.Conv2D(filters=1, kernel_size=1, padding='same', activation=tf.nn.sigmoid)
 
     def call(self, input):
 
-        resnet_layers = self.resnet_layers(input)
-
-        # 1
-        layer_shape = tf.shape(resnet_layers[0])
-        g1 = tf.image.resize(resnet_layers[0], size=[layer_shape[1] * 2, layer_shape[2] * 2])
-
-        # 2
-        c1_1 = self.l1(tf.concat([g1, resnet_layers[1]], axis=-1))
-        h1 = self.h1(c1_1)
-        layer_shape = tf.shape(resnet_layers[1])
-        g2 = tf.image.resize(h1, size=[layer_shape[1] * 2, layer_shape[2] * 2])
-
-        # 3
-        c1_2 = self.l2(tf.concat([g2, resnet_layers[2]], axis=-1))
-        h2 = self.h2(c1_2)
-        layer_shape = tf.shape(resnet_layers[2])
-        g3 = tf.image.resize(h2, size=[layer_shape[1] * 2, layer_shape[2] * 2])
-
-        # 4
-        c1_3 = self.l3(tf.concat([g3, resnet_layers[3]], axis=-1))
-        h3 = self.h3(c1_3)
-        g4 = self.g1(h3)
-
-        # f_score and f_geometry
-        f_score = self.f_score(g4)
-        geo_map = self.geo_map(g4) * 512
-        angle_map = (self.angle_map(g4) - 0.5) * np.pi / 2
+        f_score = self.f_score(input)
+        geo_map = self.geo_map(input) * 512
+        angle_map = (self.angle_map(input) - 0.5) * np.pi / 2
         f_geometry = tf.concat([geo_map, angle_map], axis=-1)
 
-        return g4, f_score, f_geometry
+        return f_score, f_geometry
 
-    def dice_coefficient(self, f_score, f_score_, training_mask):
-        '''
-        dice loss
-        :param f_score:
-        :param f_score_:
-        :param training_mask:
-        :return:
-        '''
+    @staticmethod
+    def loss_classification(f_score, f_score_, training_mask):
+        """
+        :param f_score: ground truth of text
+        :param f_score_: prediction os text
+        :param training_mask: mask used in training, to ignore some text annotated by ###
+                :return:
+        """
         eps = 1e-5
         intersection = tf.reduce_sum(f_score * f_score_ * training_mask)
         union = tf.reduce_sum(f_score * training_mask) + tf.reduce_sum(f_score_ * training_mask) + eps
         loss = 1. - (2 * intersection / union)
         return loss
 
-    def loss(self, f_score, f_score_, geo_score, geo_score_, training_mask):
-        '''
-        define the loss used for training, contraning two part,
-        the first part we use dice loss instead of weighted logloss,
-        the second part is the iou loss defined in the paper
-        :param f_score: ground truth of text
-        :param f_score_: prediction os text
+    @staticmethod
+    def loss_regression(geo_score, geo_score_):
+        """
         :param geo_score: ground truth of geometry
         :param geo_score_: prediction of geometry
-        :param training_mask: mask used in training, to ignore some text annotated by ###
         :return:
-        '''
-        classification_loss = self.dice_coefficient(f_score, f_score_, training_mask)
-        # scale classification loss to match the iou loss part
-        classification_loss *= 0.01
+        """
 
         # d1 -> top, d2->right, d3->bottom, d4->left
         d1_gt, d2_gt, d3_gt, d4_gt, theta_gt = tf.split(value=geo_score, num_or_size_splits=5, axis=3)
@@ -149,39 +146,67 @@ class SharedConv(tf.keras.Model):
         L_theta = 1 - tf.cos(theta_pred - theta_gt)
         L_g = L_AABB + 20 * L_theta
 
-        return tf.reduce_mean(L_g * f_score * training_mask) + classification_loss
+        return L_g
+
+    def loss_detection(self, f_score, f_score_, geo_score, geo_score_, training_mask):
+        """
+        :param f_score:
+        :param f_score_:
+        :param geo_score:
+        :param geo_score_:
+        :param training_mask:
+        :return:
+        """
+
+        loss_clasification = self.loss_classification(f_score, f_score_, training_mask)
+        loss_regression = self.loss_regression(geo_score, geo_score_)
+        return tf.reduce_mean(loss_regression * f_score * training_mask) + loss_clasification * 0.01
 
 
-model_sharedconv = SharedConv(input_shape=(160, 160, 3))
-optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)
-[print(i.name) for i in model_sharedconv.trainable_variables]
+class RoIRotateModel(tf.keras.Model):
+    def __init__(self):
+        super(RoIRotateModel, self).__init__()
 
-max_iter = 10
+
+class RecognitionModel(tf.keras.Model):
+    def __init__(self):
+        super(RecognitionModel, self).__init__()
+
+
+# -------- #
+
+model_sharedconv = SharedConv(input_shape=(320, 320, 3))
+model_detection = DetectionModel()
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.001, clipnorm=5)
+[print(i.name) for i in model_sharedconv.trainable_variables + model_detection.trainable_variables]
+
+max_iter = 100
 iter = 0
-for x_batch in generator(input_size=160, batch_size=2):
+for x_batch in generator(input_size=320, batch_size=1):
 
     with tf.GradientTape() as tape:
-        sharedconv, f_score_, geo_score_ = model_sharedconv(np.array(x_batch['images']))
-        loss = model_sharedconv.loss(np.array(x_batch['score_maps']), f_score_,
-                                     np.array(x_batch['geo_maps']), geo_score_,
-                                     np.array(x_batch['training_masks']))
+        sharedconv = model_sharedconv(np.array(x_batch['images']))
+        f_score_, geo_score_ = model_detection(sharedconv)
+        loss = model_detection.loss_detection(np.array(x_batch['score_maps']), f_score_,
+                                              np.array(x_batch['geo_maps']), geo_score_,
+                                              np.array(x_batch['training_masks']))
 
-    grads = tape.gradient(loss, model_sharedconv.trainable_variables)
-    optimizer.apply_gradients(zip(grads, model_sharedconv.trainable_variables))
+    grads = tape.gradient(loss, model_sharedconv.trainable_variables + model_detection.trainable_variables)
+    optimizer.apply_gradients(zip(grads, model_sharedconv.trainable_variables + model_detection.trainable_variables))
     print(loss.numpy() * 100)
-
-    print((prev - model_sharedconv.trainable_variables[0]).numpy().sum())
-    prev = model_sharedconv.trainable_variables[0]
-
-    # if loss.numpy() *100 == 0.9999999776482582:
-    #     break
 
     iter += 1
     if iter == max_iter:
         break
 
-# -------- #
 
-f_score = np.array(x_batch['score_maps'])
-geo_score = np.array(x_batch['geo_maps'])
-training_mask = np.array(x_batch['training_masks'])
+# -------- #
+for x_batch in generator(input_size=160, batch_size=2):
+    break
+
+cv2.imshow('a', cv2.resize(x_batch['images'][0], (512, 512)).astype(np.uint8))
+cv2.imshow('b', cv2.resize(x_batch['score_maps'][0]*255, (512, 512)).astype(np.uint8))
+cv2.imshow('c', cv2.resize(f_score_[0, ::].numpy()*255, (512, 512)).astype(np.uint8))
+cv2.imshow('d', cv2.resize(x_batch['training_masks'][0]*255, (512, 512)).astype(np.uint8))
+cv2.waitKey(0)
+cv2.destroyAllWindows()

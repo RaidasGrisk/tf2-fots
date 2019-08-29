@@ -17,31 +17,12 @@ from shapely.geometry import Polygon
 # from data_util import GeneratorEnqueuer
 import config
 
-# import sys
-# np.set_printoptions(edgeitems=30, linewidth=100000, threshold=sys.maxsize, formatter=dict(float=lambda x: "%.3g" % x))
-
-# from demo import detect, sort_poly
-#
-# tf.app.flags.DEFINE_string('training_data_path', 'C:/Users/Raidas/Desktop/py_projects/FOTS_TF-master/ICDAR15/ch4_training_images', 'training dataset to use')
-# tf.app.flags.DEFINE_string('training_annotation_path', 'C:/Users/Raidas/Desktop/py_projects/FOTS_TF-master/ICDAR15/ch4_training_localization_transcription_gt', 'training dataset to use')
-# tf.app.flags.DEFINE_integer('max_image_large_side', 1280, 'max image size of training')
-# tf.app.flags.DEFINE_integer('max_text_size', 800, 'if the text in the input image is bigger than this, then we resize the image according to this')
-# tf.app.flags.DEFINE_integer('min_text_size', 10, 'if the text size is smaller than this, we ignore it during training')
-# tf.app.flags.DEFINE_float('min_crop_side_ratio', 0.1, 'when doing random crop from input image, the min length of min(H, W')
-# tf.app.flags.DEFINE_string('geometry', 'RBOX', 'which geometry to generate, RBOX or QUAD')
-
-
-# FLAGS = tf.app.flags.FLAGS.flag_values_dict()
-
-FLAGS = {'training_data_path': 'C:/Users/Raidas/Desktop/fots/ICDAR15/ch4_training_images',
-         'training_annotation_path': 'C:/Users/Raidas/Desktop/fots/ICDAR15/ch4_training_localization_transcription_gt',
-         'min_text_size': 10}
 
 def get_images():
     files = []
     for ext in ['jpg', 'png', 'jpeg']:
         files.extend(glob.glob(
-            os.path.join(FLAGS['training_data_path'], '*.{}'.format(ext))))
+            os.path.join(config.FLAGS['training_data_path'], '*.{}'.format(ext))))
     return files
 
 
@@ -278,7 +259,7 @@ def crop_area(im, polys, tags, labels, crop_background=False, max_tries=50):
         ymax = np.max(yy) - pad_h
         ymin = np.clip(ymin, 0, h-1)
         ymax = np.clip(ymax, 0, h-1)
-        if xmax - xmin < FLAGS.min_crop_side_ratio*w or ymax - ymin < FLAGS.min_crop_side_ratio*h:
+        if xmax - xmin < config.FLAGS.min_crop_side_ratio*w or ymax - ymin < config.FLAGS.min_crop_side_ratio*h:
             # area too small
             continue
         if polys.shape[0] != 0:
@@ -347,7 +328,7 @@ def crop_area(im, polys, tags, crop_background=False, max_tries=50):
         ymax = np.max(yy) - pad_h
         ymin = np.clip(ymin, 0, h - 1)
         ymax = np.clip(ymax, 0, h - 1)
-        # if xmax - xmin < FLAGS.min_crop_side_ratio*w or ymax - ymin < FLAGS.min_crop_side_ratio*h:
+        # if xmax - xmin < config.FLAGS.min_crop_side_ratio*w or ymax - ymin < config.FLAGS.min_crop_side_ratio*h:
         if xmax - xmin < 0.1 * w or ymax - ymin < 0.1 * h:
             # area too small
             continue
@@ -681,7 +662,7 @@ def generate_rbox(im_size, polys, tags):
         # if the poly is too small, then ignore it during training
         poly_h = min(np.linalg.norm(poly[0] - poly[3]), np.linalg.norm(poly[1] - poly[2]))
         poly_w = min(np.linalg.norm(poly[0] - poly[1]), np.linalg.norm(poly[2] - poly[3]))
-        if min(poly_h, poly_w) < FLAGS['min_text_size']:
+        if min(poly_h, poly_w) < config.FLAGS['min_text_size']:
             cv2.fillPoly(training_mask, poly.astype(np.int32)[np.newaxis, :, :], 0)
         if tag:
             cv2.fillPoly(training_mask, poly.astype(np.int32)[np.newaxis, :, :], 0)
@@ -842,7 +823,7 @@ def get_project_matrix_and_width(text_polyses, text_tags, target_height=8.0):
 def generator(input_size=512, batch_size=32, background_ratio=0, random_scale=np.array([0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.2]), vis=False):
 
     image_list = np.array(get_images())
-    print('{} training images in {}'.format(image_list.shape[0], FLAGS['training_data_path']))
+    print('{} training images in {}'.format(image_list.shape[0], config.FLAGS['training_data_path']))
     index = np.arange(0, image_list.shape[0])
     while True:
         np.random.shuffle(index)
@@ -864,7 +845,7 @@ def generator(input_size=512, batch_size=32, background_ratio=0, random_scale=np
                 im = cv2.imread(im_fn)
                 h, w, _ = im.shape
                 child_name = im_fn.replace(os.path.basename(im_fn).split('.')[1], 'txt').split('/')[-1].split('\\')[-1]
-                txt_fn = FLAGS['training_annotation_path'] + '/gt_' + child_name
+                txt_fn = config.FLAGS['training_annotation_path'] + '/gt_' + child_name
 
                 if not os.path.exists(txt_fn):
                     print('text file {} does not exists'.format(txt_fn))
@@ -896,7 +877,7 @@ def generator(input_size=512, batch_size=32, background_ratio=0, random_scale=np
                     im_padded[:new_h, :new_w, :] = im.copy()
                     im = cv2.resize(im_padded, dsize=(input_size, input_size))
                     score_map = np.zeros((input_size, input_size), dtype=np.uint8)
-                    geo_map_channels = 5 if FLAGS['geometry'] == 'RBOX' else 8
+                    geo_map_channels = 5 if config.FLAGS['geometry'] == 'RBOX' else 8
                     geo_map = np.zeros((input_size, input_size, geo_map_channels), dtype=np.float32)
                     training_mask = np.ones((input_size, input_size), dtype=np.uint8)
                 else:
