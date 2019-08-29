@@ -4,9 +4,8 @@ In progress
 
 # TODO
 
-- [ ] Resnet50 feature extraction
-- [ ] Resnet50 feature fusion
-- [ ] Text detection part
+- [x] Resnet50 feature extraction + fusion
+- [x] Text detection part
 - [ ] RoI rotate part
 - [ ] Text recognition part
 - [ ] Data generation
