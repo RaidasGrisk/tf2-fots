@@ -3,9 +3,11 @@
 In progress
 
 # TODO
-1. Resnet50 feature fusion
-2. Text detection part
-3. RoI rotate part
-4. Text recognition part
-5. Data generation
-6. Training/testing pipelines
+
+- [ ] Resnet50 feature extraction
+- [ ] Resnet50 feature fusion
+- [ ] Text detection part
+- [ ] RoI rotate part
+- [ ] Text recognition part
+- [ ] Data generation
+- [ ] Training/testing pipelines
