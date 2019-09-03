@@ -10,3 +10,5 @@ In progress
 - [ ] Text recognition part
 - [ ] Data generation
 - [ ] Training/testing pipelines
+- [ ] clean and structure the code
+- [ ] documentation
