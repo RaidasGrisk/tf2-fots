@@ -1,20 +1,11 @@
-# coding:utf-8
 import glob
-import csv
 import cv2
-import time
 import os
 import math
 import numpy as np
-import scipy.optimize
-# import matplotlib.pyplot as plt
-# import matplotlib.patches as Patches
 from itertools import compress
 from shapely.geometry import Polygon
 
-# import tensorflow as tf
-
-# from data_util import GeneratorEnqueuer
 import config
 
 
@@ -65,36 +56,6 @@ def sparse_tuple_from(sequences, dtype=np.int32):
     shape = np.asarray([len(sequences), np.asarray(indices).max(0)[1] + 1], dtype=np.int64)
 
     return indices, values, shape
-
-
-"""
-def load_annoataion(p):
-    '''
-    load annotation from the text file
-    :param p:
-    :return:
-    '''
-    text_polys = []
-    text_tags = []
-    labels = []
-    if not os.path.exists(p):
-        return np.array(text_polys, dtype=np.float32)
-    with open(p, 'r') as f:
-        reader = csv.reader(f)
-        for line in reader:
-            label = line[-1]
-            # strip BOM. \ufeff for python3,  \xef\xbb\bf for python2
-            line = [i.strip('\ufeff').strip('\xef\xbb\xbf') for i in line]
-            x1, y1, x2, y2, x3, y3, x4, y4 = list(map(float, line[:8]))
-            text_polys.append([[x1, y1], [x2, y2], [x3, y3], [x4, y4]])
-            if label == '*' or label == '###' or label == '':
-                text_tags.append(True)
-                labels.append([-1])
-            else:
-                labels.append(label_to_array(label))
-                text_tags.append(False)
-        return np.array(text_polys, dtype=np.float32), np.array(text_tags, dtype=np.bool), labels
-"""
 
 
 def load_annoataion(p):
@@ -217,75 +178,6 @@ def check_and_validate_polys(polys, tags, xxx_todo_changeme):
         validated_polys.append(poly)
         validated_tags.append(tag)
     return np.array(validated_polys), np.array(validated_tags)
-
-
-"""
-def crop_area(im, polys, tags, labels, crop_background=False, max_tries=50):
-    '''
-    make random crop from the input image
-    :param im:
-    :param polys:
-    :param tags:
-    :param crop_background:
-    :param max_tries:
-    :return:
-    '''
-    h, w, _ = im.shape
-    pad_h = h//10
-    pad_w = w//10
-    h_array = np.zeros((h + pad_h*2), dtype=np.int32)
-    w_array = np.zeros((w + pad_w*2), dtype=np.int32)
-    for poly in polys:
-        poly = np.round(poly, decimals=0).astype(np.int32)
-        minx = np.min(poly[:, 0])
-        maxx = np.max(poly[:, 0])
-        w_array[minx+pad_w:maxx+pad_w] = 1
-        miny = np.min(poly[:, 1])
-        maxy = np.max(poly[:, 1])
-        h_array[miny+pad_h:maxy+pad_h] = 1
-    # ensure the cropped area not across a text
-    h_axis = np.where(h_array == 0)[0]
-    w_axis = np.where(w_array == 0)[0]
-    if len(h_axis) == 0 or len(w_axis) == 0:
-        return im, polys, tags, labels
-    for i in range(max_tries):
-        xx = np.random.choice(w_axis, size=2)
-        xmin = np.min(xx) - pad_w
-        xmax = np.max(xx) - pad_w
-        xmin = np.clip(xmin, 0, w-1)
-        xmax = np.clip(xmax, 0, w-1)
-        yy = np.random.choice(h_axis, size=2)
-        ymin = np.min(yy) - pad_h
-        ymax = np.max(yy) - pad_h
-        ymin = np.clip(ymin, 0, h-1)
-        ymax = np.clip(ymax, 0, h-1)
-        if xmax - xmin < config.FLAGS.min_crop_side_ratio*w or ymax - ymin < config.FLAGS.min_crop_side_ratio*h:
-            # area too small
-            continue
-        if polys.shape[0] != 0:
-            poly_axis_in_area = (polys[:, :, 0] >= xmin) & (polys[:, :, 0] <= xmax) \
-                                & (polys[:, :, 1] >= ymin) & (polys[:, :, 1] <= ymax)
-            selected_polys = np.where(np.sum(poly_axis_in_area, axis=1) == 4)[0]
-        else:
-            selected_polys = []
-        if len(selected_polys) == 0:
-            # no text in this area
-            if crop_background:
-                return im[ymin:ymax+1, xmin:xmax+1, :], polys[selected_polys], tags[selected_polys], []
-            else:
-                continue
-        select_labels = []
-        im = im[ymin:ymax+1, xmin:xmax+1, :]
-        polys = polys[selected_polys]
-        tags = tags[selected_polys]
-
-        for select in selected_polys:
-            select_labels.append(labels[select])
-        polys[:, :, 0] -= xmin
-        polys[:, :, 1] -= ymin
-        return im, polys, tags, select_labels
-    return im, polys, tags, labels
-"""
 
 
 def crop_area(im, polys, tags, crop_background=False, max_tries=50):
@@ -1032,7 +924,6 @@ def generator(input_size=640, batch_size=2, background_ratio=0, random_scale=np.
                     # yield images, image_fns, score_maps, geo_maps, training_masks
                     # yield images, image_fns, score_maps, geo_maps, training_masks, transform_matrixes, boxes_masks, box_widths, text_labels_sparse,
 
-
                     yield {'images': np.array(images),
                            'image_fns': np.array(image_fns),
                            'score_maps': np.array(score_maps),
@@ -1058,87 +949,3 @@ def generator(input_size=640, batch_size=2, background_ratio=0, random_scale=np.
                 import traceback
                 traceback.print_exc()
                 continue
-
-
-def get_batch(num_workers, **kwargs):
-    enqueuer = None
-    try:
-        enqueuer = GeneratorEnqueuer(generator(**kwargs), use_multiprocessing=False)
-        print('Generator use 10 batches for buffering, this may take a while, you can tune this yourself.')
-        enqueuer.start(max_queue_size=10, workers=num_workers)
-        generator_output = None
-        while True:
-            while enqueuer.is_running():
-                if not enqueuer.queue.empty():
-                    generator_output = enqueuer.queue.get()
-                    break
-                else:
-                    time.sleep(0.01)
-            yield generator_output
-            generator_output = None
-    finally:
-        if enqueuer is not None:
-            enqueuer.stop()
-
-
-# if __name__ == '__main__':
-#
-#     """
-#     score_maps matrix of ints [0, 1], marks text regions
-#     geo_maps   matrix of ints [0, 10+], possibly marks angle?
-#     training_masks matrix of ints [0, 1], 1 marks good pixel, 0 blurry regions?
-#     transform_matrixes
-#     boxes_masks array if ints [0, 1]
-#     box_widths array if ints [0, 99++]
-#     text_labels_sparse 3 matrixes encoding the text
-#     """
-#
-#     data_generator = get_batch(num_workers=1, input_size=512, batch_size=1)
-#     data = next(data_generator)
-#
-#     print(data.keys())
-#
-#     for key in data:
-#         if isinstance(data[key], (list, np.ndarray)):
-#             print(key, data[key][0].shape)
-#         else:
-#             print(key, [i.shape for i in data[key]])
-#
-#     # text
-#     for label in [data['text_labels_sparse']]:
-#         a, b, c = label
-#         counter = 0
-#         prev_c = None
-#         counter_list = []
-#         for c in a[:, 0]:
-#             if prev_c != c:
-#                 counter_list.append(counter)
-#             prev_c = c
-#             counter += 1
-#         for start, end in zip(counter_list, counter_list[1:]):
-#             print(ground_truth_to_word(b[start: end]))
-#     #
-#     # # image
-#     # score_maps_ = data['score_maps'][0].copy().astype(np.uint8)
-#     # geo_maps_ = data['geo_maps'][0].copy().astype(np.uint8)
-#     # training_masks_ = data['training_masks'][0].copy().astype(np.uint8)
-#     # score_maps_ = cv2.resize(score_maps_, (512, 512))
-#     # geo_maps_ = cv2.resize(geo_maps_, (512, 512))
-#     # training_masks_ = cv2.resize(training_masks_, (512, 512))
-#     # cv2.imshow("img", data['images'][0].astype(np.uint8))
-#     # cv2.imshow("img", score_maps_*250)
-#     # cv2.imshow("img", geo_maps_[:, :, 0]*250)
-#     # cv2.imshow("img", training_masks_*250)
-#     #
-#     # # draw boxes
-#     # boxes = detect(score_map=data['score_maps'][0].copy().astype(np.uint8)[np.newaxis, :, :, :].copy(), geo_map=data['geo_maps'][0].copy().astype(np.uint8)[np.newaxis, :, :, :].copy(), box_thresh=0.01)
-#     # boxes = boxes[:, :8].reshape((-1, 4, 2))
-#     # boxes = sort_poly(boxes[0].astype(np.int32))
-#     # im = cv2.polylines(data['images'][0].astype(np.uint8).copy(), [boxes.astype(np.int32).reshape((-1, 1, 2))], True, color=(255, 255, 0), thickness=1)
-#     #
-#     # cv2.imshow("img", im)
-
-
-# cv2.imshow('a', im)
-# cv2.waitKey(0)
-# cv2.destroyAllWindows()
