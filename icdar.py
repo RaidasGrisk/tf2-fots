@@ -639,6 +639,36 @@ def restore_rectangle(origin, geometry):
     return restore_rectangle_rbox(origin, geometry)
 
 
+def generate_roiRotatePara(box, angle, expand_w=60):
+    p0_rect, p1_rect, p2_rect, p3_rect = box
+    cxy = (p0_rect + p2_rect) / 2.
+    size = np.array([np.linalg.norm(p0_rect - p1_rect), np.linalg.norm(p0_rect - p3_rect)])
+    rrect = np.concatenate([cxy, size])
+
+    box = np.array(box)
+
+    points = np.array(box, dtype=np.int32)
+    xmin = np.min(points[:, 0])
+    xmax = np.max(points[:, 0])
+    ymin = np.min(points[:, 1])
+    ymax = np.max(points[:, 1])
+    bbox = np.array([xmin, ymin, xmax, ymax])
+    if np.any(bbox < -expand_w):
+        return None
+
+    rrect[:2] -= bbox[:2]
+    rrect[:2] -= rrect[2:] / 2
+    rrect[2:] += rrect[:2]
+
+    bbox[2:] -= bbox[:2]
+
+    rrect[::2] = np.clip(rrect[::2], 0, bbox[2])
+    rrect[1::2] = np.clip(rrect[1::2], 0, bbox[3])
+    rrect[2:] -= rrect[:2]
+
+    return bbox.astype(np.int32).tolist(), rrect.astype(np.int32).tolist(), - angle
+
+
 def generate_rbox(im_size, polys, tags):
     h, w = im_size
     poly_mask = np.zeros((h, w), dtype=np.uint8)
@@ -647,6 +677,13 @@ def generate_rbox(im_size, polys, tags):
     # mask used during traning, to ignore some hard areas
     training_mask = np.ones((h, w), dtype=np.uint8)
     rectangles = []
+
+    # ---------------- #
+    outBoxs = []
+    cropBoxs = []
+    angles = []
+    # ---------------- #
+
     for poly_idx, poly_tag in enumerate(zip(polys, tags)):
         poly = poly_tag[0]
         tag = poly_tag[1]
@@ -657,15 +694,16 @@ def generate_rbox(im_size, polys, tags):
                        np.linalg.norm(poly[i] - poly[(i - 1) % 4]))
         # score map
         shrinked_poly = shrink_poly(poly.copy(), r).astype(np.int32)[np.newaxis, :, :]
-        cv2.fillPoly(score_map, shrinked_poly, 1)
-        cv2.fillPoly(poly_mask, shrinked_poly, poly_idx + 1)
+        score_map = cv2.fillPoly(score_map, shrinked_poly, 1)
+        poly_mask = cv2.fillPoly(poly_mask, shrinked_poly, poly_idx + 1)
+
         # if the poly is too small, then ignore it during training
         poly_h = min(np.linalg.norm(poly[0] - poly[3]), np.linalg.norm(poly[1] - poly[2]))
         poly_w = min(np.linalg.norm(poly[0] - poly[1]), np.linalg.norm(poly[2] - poly[3]))
         if min(poly_h, poly_w) < config.FLAGS['min_text_size']:
-            cv2.fillPoly(training_mask, poly.astype(np.int32)[np.newaxis, :, :], 0)
+            training_mask = cv2.fillPoly(training_mask, poly.astype(np.int32)[np.newaxis, :, :], 0)
         if tag:
-            cv2.fillPoly(training_mask, poly.astype(np.int32)[np.newaxis, :, :], 0)
+            training_mask = cv2.fillPoly(training_mask, poly.astype(np.int32)[np.newaxis, :, :], 0)
 
         xy_in_poly = np.argwhere(poly_mask == (poly_idx + 1))
         # if geometry == 'RBOX':
@@ -746,6 +784,16 @@ def generate_rbox(im_size, polys, tags):
         rectangles.append(rectange.flatten())
 
         p0_rect, p1_rect, p2_rect, p3_rect = rectange
+
+        # ------------------ #
+        roiRotatePara = generate_roiRotatePara(rectange, rotate_angle)
+        if roiRotatePara:
+            outBox, cropBox, angle = roiRotatePara
+            outBoxs.append(outBox)
+            cropBoxs.append(cropBox)
+            angles.append(angle)
+        # ------------------ #
+
         for y, x in xy_in_poly:
             point = np.array([x, y], dtype=np.float32)
             # top
@@ -758,7 +806,7 @@ def generate_rbox(im_size, polys, tags):
             geo_map[y, x, 3] = point_dist_to_line(p3_rect, p0_rect, point)
             # angle
             geo_map[y, x, 4] = rotate_angle
-    return score_map, geo_map, training_mask, rectangles
+    return score_map, geo_map, training_mask, (outBoxs, cropBoxs, angles), rectangles
 
 
 def get_project_matrix_and_width(text_polyses, text_tags, target_height=8.0):
@@ -820,18 +868,19 @@ def get_project_matrix_and_width(text_polyses, text_tags, target_height=8.0):
 
 # Change for FOTS training
 # TODO: output a dict
-def generator(input_size=512, batch_size=32, background_ratio=0, random_scale=np.array([0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.2]), vis=False):
+def generator(input_size=640, batch_size=2, background_ratio=0, random_scale=np.array([0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.2]), vis=False):
 
     image_list = np.array(get_images())
     print('{} training images in {}'.format(image_list.shape[0], config.FLAGS['training_data_path']))
     index = np.arange(0, image_list.shape[0])
     while True:
-        np.random.shuffle(index)
+        # np.random.shuffle(index)
         images = []
         image_fns = []
         score_maps = []
         geo_maps = []
         training_masks = []
+        rboxes = []
 
         text_polyses = []
         text_tagses = []
@@ -859,9 +908,9 @@ def generator(input_size=512, batch_size=32, background_ratio=0, random_scale=np
                 # random scale this image
                 # Start the data augmentation
                 # 3.20 start re-scale on both width and height
-                rd_scale = np.random.choice(random_scale)
-                im = cv2.resize(im, dsize=None, fx=rd_scale, fy=rd_scale)
-                text_polys *= rd_scale
+                # rd_scale = np.random.choice(random_scale)
+                # im = cv2.resize(im, dsize=None, fx=rd_scale, fy=rd_scale)
+                # text_polys *= rd_scale
                 # print rd_scale
                 # random crop a area from image
                 if np.random.rand() < background_ratio:  # Since the background_ratio is 0 so it won't dive in this branch
@@ -884,7 +933,7 @@ def generator(input_size=512, batch_size=32, background_ratio=0, random_scale=np
                     # Cancel the data augmentation
                     # Third 640×640 random samples are cropped. Here it is little diffrent from paper
                     # im, text_polys, text_tags, text_label = crop_area(im, text_polys, text_tags, text_label, crop_background=False)
-                    im, text_polys, text_tags, selected_poly = crop_area(im, text_polys, text_tags, crop_background=False)
+                    # im, text_polys, text_tags, selected_poly = crop_area(im, text_polys, text_tags, crop_background=False)
 
                     """
                     while [-1] in text_label:
@@ -918,7 +967,7 @@ def generator(input_size=512, batch_size=32, background_ratio=0, random_scale=np
                     text_polys[:, :, 1] *= resize_ratio_3_y
                     new_h, new_w, _ = im.shape
                     # score_map, geo_map, training_mask = generate_rbox((new_h, new_w), text_polys, text_tags)
-                    score_map, geo_map, training_mask, rectangles = generate_rbox((new_h, new_w), text_polys, text_tags)
+                    score_map, geo_map, training_mask, rbox, rectangles = generate_rbox(im_size=(new_h, new_w), polys=text_polys, tags=text_tags)
 
                     # check if score map and geo_map is adjusted properly because the lines do not overlap completely
                     # cv2.imshow('frame', im)
@@ -930,11 +979,14 @@ def generator(input_size=512, batch_size=32, background_ratio=0, random_scale=np
 
                     # text_polys = np.array(text_polys).reshape(-1, 8)
                     # boxes_mask = np.array([count] * text_polys.shape[0])
-                    text_label = [text_label[i] for i in selected_poly]
+                    # text_label = [text_label[i] for i in selected_poly]
                     # rectangles = [rectangles[i] for i in selected_poly]
+
                     mask = [not (word == [-1]) for word in text_label]
                     text_label = list(compress(text_label, mask))
                     rectangles = list(compress(rectangles, mask))
+                    rbox = tuple([list(compress(item, mask)) for item in rbox])
+                    # rbox = tuple(compress(rbox, mask))
 
                     assert len(text_label) == len(rectangles)
                     if len(text_label) == 0:
@@ -949,6 +1001,7 @@ def generator(input_size=512, batch_size=32, background_ratio=0, random_scale=np
                 score_maps.append(score_map[::4, ::4, np.newaxis].astype(np.float32))
                 geo_maps.append(geo_map[::4, ::4, :].astype(np.float32))
                 training_masks.append(training_mask[::4, ::4, np.newaxis].astype(np.float32))
+                rboxes.append(rbox)
 
                 text_polyses.append(rectangles)
                 boxes_masks.append(boxes_mask)
@@ -978,11 +1031,14 @@ def generator(input_size=512, batch_size=32, background_ratio=0, random_scale=np
 
                     # yield images, image_fns, score_maps, geo_maps, training_masks
                     # yield images, image_fns, score_maps, geo_maps, training_masks, transform_matrixes, boxes_masks, box_widths, text_labels_sparse,
-                    yield {'images': images,
-                           'image_fns': image_fns,
-                           'score_maps': score_maps,
-                           'geo_maps': geo_maps,
-                           'training_masks': training_masks,
+
+
+                    yield {'images': np.array(images),
+                           'image_fns': np.array(image_fns),
+                           'score_maps': np.array(score_maps),
+                           'geo_maps': np.array(geo_maps),
+                           'training_masks': np.array(training_masks),
+                           'rboxes': rboxes,
                            'transform_matrixes': transform_matrixes,
                            'boxes_masks': boxes_masks,
                            'box_widths': box_widths,
@@ -992,6 +1048,7 @@ def generator(input_size=512, batch_size=32, background_ratio=0, random_scale=np
                     score_maps = []
                     geo_maps = []
                     training_masks = []
+                    rboxes = []
                     text_polyses = []
                     text_tagses = []
                     boxes_masks = []
@@ -1080,3 +1137,8 @@ def get_batch(num_workers, **kwargs):
 #     # im = cv2.polylines(data['images'][0].astype(np.uint8).copy(), [boxes.astype(np.int32).reshape((-1, 1, 2))], True, color=(255, 255, 0), thickness=1)
 #     #
 #     # cv2.imshow("img", im)
+
+
+# cv2.imshow('a', im)
+# cv2.waitKey(0)
+# cv2.destroyAllWindows()
