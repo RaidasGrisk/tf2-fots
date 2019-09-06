@@ -105,7 +105,7 @@ class Recognition(tf.keras.Model):
         self.layer_3 = tf.keras.layers.Conv2D(filters=64, kernel_size=(3, 3), padding="same", activation=tf.nn.relu)
         self.layer_4 = tf.keras.layers.MaxPool2D(pool_size=[2, 1], strides=[2, 1])
 
-        self.layer_5 = tf.keras.layers.Conv2D(filters=256, kernel_size=(3, 3), padding="same", activation=tf.nn.relu)
+        self.layer_5 = tf.keras.layers.Conv2D(filters=256, kernel_size=(3, 3), padding="same")
         self.layer_6 = tf.keras.layers.BatchNormalization(trainable=training)
 
         self.layer_7 = tf.keras.layers.Conv2D(filters=256, kernel_size=(3, 3), padding="same", activation=tf.nn.relu)
@@ -132,6 +132,7 @@ class Recognition(tf.keras.Model):
 
         x = self.layer_5(x)
         x = self.layer_6(x)
+        x = tf.nn.relu(x)
         x = self.layer_7(x)
         x = self.layer_8(x)
 
