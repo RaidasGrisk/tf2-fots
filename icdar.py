@@ -20,23 +20,10 @@ def get_images():
 def label_to_array(label):
     try:
         label = label.replace(' ', '')
-        return [config.CHAR_VECTOR.index(x) if x in config.CHAR_VECTOR else 63 for x in label]
+        return [config.CHAR_VECTOR.index(x) if x in config.CHAR_VECTOR else len(config.CHAR_VECTOR)-1 for x in label]
     except Exception as ex:
         print(label)
         raise ex
-
-
-def ground_truth_to_word(ground_truth):
-    """
-        Return the word string based on the input ground_truth
-    """
-
-    try:
-        return ''.join([config.CHAR_VECTOR[i] for i in ground_truth if i != -1])
-    except Exception as ex:
-        print(ground_truth)
-        print(ex)
-        input()
 
 
 def sparse_tuple_from(sequences, dtype=np.int32):
@@ -150,7 +137,6 @@ def check_and_validate_polys(polys, tags, xxx_todo_changeme):
                         return False
         # 还需要判断两线段（p0p1与p2p3）是否有交点，因label中不存在这种错误，暂不实现
         return True
-
 
     (h, w) = xxx_todo_changeme
     if polys.shape[0] == 0:
@@ -558,7 +544,7 @@ def generate_roiRotatePara(box, angle, expand_w=60):
     rrect[1::2] = np.clip(rrect[1::2], 0, bbox[3])
     rrect[2:] -= rrect[:2]
 
-    return bbox.astype(np.int32).tolist(), rrect.astype(np.int32).tolist(), - angle
+    return bbox.astype(np.int32).tolist(), rrect.astype(np.int32).tolist(), -angle
 
 
 def generate_rbox(im_size, polys, tags):
@@ -758,8 +744,6 @@ def get_project_matrix_and_width(text_polyses, text_tags, target_height=8.0):
     return project_matrixes, box_widths
 
 
-# Change for FOTS training
-# TODO: output a dict
 def generator(input_size=640, batch_size=2, background_ratio=0, random_scale=np.array([0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.2]), vis=False):
 
     image_list = np.array(get_images())
@@ -788,9 +772,9 @@ def generator(input_size=640, batch_size=2, background_ratio=0, random_scale=np.
                 child_name = im_fn.replace(os.path.basename(im_fn).split('.')[1], 'txt').split('/')[-1].split('\\')[-1]
                 txt_fn = config.FLAGS['training_annotation_path'] + '/gt_' + child_name
 
-                if not os.path.exists(txt_fn):
-                    print('text file {} does not exists'.format(txt_fn))
-                    continue
+                # if not os.path.exists(txt_fn):
+                #     print('text file {} does not exists'.format(txt_fn))
+                #     continue
 
                 text_polys, text_tags, text_label = load_annoataion(txt_fn)  # Change for load text transiption
                 text_polys, text_tags = check_and_validate_polys(text_polys, text_tags, (h, w))
@@ -874,11 +858,13 @@ def generator(input_size=640, batch_size=2, background_ratio=0, random_scale=np.
                     # text_label = [text_label[i] for i in selected_poly]
                     # rectangles = [rectangles[i] for i in selected_poly]
 
-                    mask = [not (word == [-1]) for word in text_label]
+                    # filter out bad samples
+                    mask1 = [not (word == [-1]) for word in text_label]
+                    mask2 = [j[1] > 8 and j[0] > 8 for j in [i[2::] for i in rbox[1]]]  # make sure the text is at least 4x4 pixels
+                    mask = [True if i and j else False for (i, j) in zip(mask1, mask2)]
                     text_label = list(compress(text_label, mask))
                     rectangles = list(compress(rectangles, mask))
                     rbox = tuple([list(compress(item, mask)) for item in rbox])
-                    # rbox = tuple(compress(rbox, mask))
 
                     assert len(text_label) == len(rectangles)
                     if len(text_label) == 0:
@@ -888,7 +874,7 @@ def generator(input_size=640, batch_size=2, background_ratio=0, random_scale=np.
 
                     count += 1
 
-                images.append(im[:, :, ::-1].astype(np.float32))
+                images.append(im.astype(np.float32))  # [:, :, ::-1]
                 image_fns.append(im_fn)
                 score_maps.append(score_map[::4, ::4, np.newaxis].astype(np.float32))
                 geo_maps.append(geo_map[::4, ::4, :].astype(np.float32))

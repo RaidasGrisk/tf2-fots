@@ -40,6 +40,7 @@ class Backbone(tf.keras.Model):
     def __init__(self, backbone='resnet', input_shape=(480, 640, 3)):
         super(Backbone, self).__init__()
 
+        self.backbone_name = backbone
         if backbone == 'mobilenet':
             self.baskbone = tf.keras.applications.MobileNetV2(include_top=False, input_shape=input_shape)
             self.layer_ids = [149, 69, 39, 24]
@@ -64,9 +65,14 @@ class Backbone(tf.keras.Model):
 
     def __call__(self, input):
 
-        # layers extracted from Resnet:
+        # layers extracted from Backbone model (REsNet or MobileNet):
         # 1st is the farthest one (near the end of the net),
         # 4th is the closest one (near the beggining)
+
+        # preprocess input if MobileNet
+        if 'mobile' in self.backbone_name.lower():
+            input = tf.keras.applications.mobilenet.preprocess_input(input)
+
         layer_1, layer_2, layer_3, layer_4 = self.backbone_layers(input)
 
         # step 1
