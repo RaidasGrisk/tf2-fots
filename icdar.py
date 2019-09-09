@@ -229,7 +229,7 @@ def crop_area(im, polys, tags, crop_background=False, max_tries=50):
         polys[:, :, 1] -= ymin
         return im, polys, tags, selected_polys
 
-    return im, polys, tags, np.array(range(len(polys)))
+    return im, polys, tags, np.array(range(len(polys))).tolist()
 
 
 def shrink_poly(poly, r):
@@ -784,9 +784,9 @@ def generator(input_size=640, batch_size=2, background_ratio=0, random_scale=np.
                 # random scale this image
                 # Start the data augmentation
                 # 3.20 start re-scale on both width and height
-                # rd_scale = np.random.choice(random_scale)
-                # im = cv2.resize(im, dsize=None, fx=rd_scale, fy=rd_scale)
-                # text_polys *= rd_scale
+                rd_scale = np.random.choice(random_scale)
+                im = cv2.resize(im, dsize=None, fx=rd_scale, fy=rd_scale)
+                text_polys *= rd_scale
                 # print rd_scale
                 # random crop a area from image
                 if np.random.rand() < background_ratio:  # Since the background_ratio is 0 so it won't dive in this branch
@@ -808,23 +808,10 @@ def generator(input_size=640, batch_size=2, background_ratio=0, random_scale=np.
                 else:
                     # Cancel the data augmentation
                     # Third 640×640 random samples are cropped. Here it is little diffrent from paper
-                    # im, text_polys, text_tags, text_label = crop_area(im, text_polys, text_tags, text_label, crop_background=False)
-                    # im, text_polys, text_tags, selected_poly = crop_area(im, text_polys, text_tags, crop_background=False)
-
-                    """
-                    while [-1] in text_label:
-                        text_label.remove([-1])
-                    """
-
-                    if text_polys.shape[0] == 0 or len(text_label) == 0:
-                        continue
-
-                    """
-                    if text_polys.shape[0] != len(text_label):
-                        print "text polys is not equal to text label, check crop op"
-                        continue
-                    """
-                    h, w, _ = im.shape
+                    text_polys_, selected_polys_ = np.array([]), np.array([])
+                    while text_polys_.shape[0] == 0 or len(selected_polys_) == 0:
+                        im_, text_polys_, text_tags_, selected_polys_ = crop_area(im, text_polys, text_tags, text_label)
+                    im, text_polys, text_tags, text_label = im_, text_polys_, text_tags_, [text_label[i] for i in selected_polys_]
 
                     # pad the image to the training input size or the longer side of image
                     new_h, new_w, _ = im.shape
