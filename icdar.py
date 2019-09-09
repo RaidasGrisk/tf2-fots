@@ -167,7 +167,7 @@ def check_and_validate_polys(polys, tags, xxx_todo_changeme):
 
 
 def crop_area(im, polys, tags, crop_background=False, max_tries=50):
-    '''
+    """
     Copy from github repro FOTS.Pytorch
     make random crop from the input image
     :param im:
@@ -176,7 +176,7 @@ def crop_area(im, polys, tags, crop_background=False, max_tries=50):
     :param crop_background:
     :param max_tries:
     :return:
-    '''
+    """
     h, w, _ = im.shape
     pad_h = h // 10
     pad_w = w // 10
@@ -744,7 +744,7 @@ def get_project_matrix_and_width(text_polyses, text_tags, target_height=8.0):
     return project_matrixes, box_widths
 
 
-def generator(input_size=640, batch_size=2, background_ratio=0, random_scale=np.array([0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.2]), vis=False):
+def generator(input_size=640, batch_size=2, random_scale=np.array([0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.2]), min_img_box_size=10):
 
     image_list = np.array(get_images())
     print('{} training images in {}'.format(image_list.shape[0], config.FLAGS['training_data_path']))
@@ -772,15 +772,9 @@ def generator(input_size=640, batch_size=2, background_ratio=0, random_scale=np.
                 child_name = im_fn.replace(os.path.basename(im_fn).split('.')[1], 'txt').split('/')[-1].split('\\')[-1]
                 txt_fn = config.FLAGS['training_annotation_path'] + '/gt_' + child_name
 
-                # if not os.path.exists(txt_fn):
-                #     print('text file {} does not exists'.format(txt_fn))
-                #     continue
-
                 text_polys, text_tags, text_label = load_annoataion(txt_fn)  # Change for load text transiption
                 text_polys, text_tags = check_and_validate_polys(text_polys, text_tags, (h, w))
 
-                # if text_polys.shape[0] == 0:
-                #     continue
                 # random scale this image
                 # Start the data augmentation
                 # 3.20 start re-scale on both width and height
@@ -789,77 +783,60 @@ def generator(input_size=640, batch_size=2, background_ratio=0, random_scale=np.
                 text_polys *= rd_scale
                 # print rd_scale
                 # random crop a area from image
-                if np.random.rand() < background_ratio:  # Since the background_ratio is 0 so it won't dive in this branch
-                    # crop background
-                    im, text_polys, text_tags = crop_area(im, text_polys, text_tags, crop_background=True)
-                    if text_polys.shape[0] > 0:
-                        # cannot find background
-                        continue
-                    # pad and resize image
-                    new_h, new_w, _ = im.shape
-                    max_h_w_i = np.max([new_h, new_w, input_size])
-                    im_padded = np.zeros((max_h_w_i, max_h_w_i, 3), dtype=np.uint8)
-                    im_padded[:new_h, :new_w, :] = im.copy()
-                    im = cv2.resize(im_padded, dsize=(input_size, input_size))
-                    score_map = np.zeros((input_size, input_size), dtype=np.uint8)
-                    geo_map_channels = 5 if config.FLAGS['geometry'] == 'RBOX' else 8
-                    geo_map = np.zeros((input_size, input_size, geo_map_channels), dtype=np.float32)
-                    training_mask = np.ones((input_size, input_size), dtype=np.uint8)
-                else:
-                    # Cancel the data augmentation
-                    # Third 640×640 random samples are cropped. Here it is little diffrent from paper
-                    text_polys_, selected_polys_ = np.array([]), np.array([])
-                    while text_polys_.shape[0] == 0 or len(selected_polys_) == 0:
-                        im_, text_polys_, text_tags_, selected_polys_ = crop_area(im, text_polys, text_tags, text_label)
-                    im, text_polys, text_tags, text_label = im_, text_polys_, text_tags_, [text_label[i] for i in selected_polys_]
 
-                    # pad the image to the training input size or the longer side of image
-                    new_h, new_w, _ = im.shape
-                    max_h_w_i = np.max([new_h, new_w, input_size])
-                    im_padded = np.zeros((max_h_w_i, max_h_w_i, 3), dtype=np.uint8)
-                    im_padded[:new_h, :new_w, :] = im.copy()
-                    im = im_padded
-                    # resize the image to input size
-                    new_h, new_w, _ = im.shape
-                    resize_h = input_size
-                    resize_w = input_size
-                    im = cv2.resize(im, dsize=(resize_w, resize_h))
-                    resize_ratio_3_x = resize_w / float(new_w)
-                    resize_ratio_3_y = resize_h / float(new_h)
-                    text_polys[:, :, 0] *= resize_ratio_3_x
-                    text_polys[:, :, 1] *= resize_ratio_3_y
-                    new_h, new_w, _ = im.shape
-                    # score_map, geo_map, training_mask = generate_rbox((new_h, new_w), text_polys, text_tags)
-                    score_map, geo_map, training_mask, rbox, rectangles = generate_rbox(im_size=(new_h, new_w), polys=text_polys, tags=text_tags)
+                # Third 640×640 random samples are cropped. Here it is little diffrent from paper
+                text_polys_, selected_polys_ = np.array([]), np.array([])
+                while text_polys_.shape[0] == 0 or len(selected_polys_) == 0:
+                    im_, text_polys_, text_tags_, selected_polys_ = crop_area(im, text_polys, text_tags, text_label)
+                im, text_polys, text_tags, text_label = im_, text_polys_, text_tags_, [text_label[i] for i in selected_polys_]
 
-                    # check if score map and geo_map is adjusted properly because the lines do not overlap completely
-                    # cv2.imshow('frame', im)
-                    # cv2.imshow('frame', score_map*128)
-                    # cv2.imshow('frame', geo_map[:, :, 0] * 125)
-                    # cv2.imshow('frame', training_mask * 125)
+                # pad the image to the training input size or the longer side of image
+                new_h, new_w, _ = im.shape
+                max_h_w_i = np.max([new_h, new_w, input_size])
+                im_padded = np.zeros((max_h_w_i, max_h_w_i, 3), dtype=np.uint8)
+                im_padded[:new_h, :new_w, :] = im.copy()
+                im = im_padded
 
-                    # print rectangles.shape
+                # resize the image to input size
+                new_h, new_w, _ = im.shape
+                resize_h = input_size
+                resize_w = input_size
+                im = cv2.resize(im, dsize=(resize_w, resize_h))
+                resize_ratio_3_x = resize_w / float(new_w)
+                resize_ratio_3_y = resize_h / float(new_h)
+                text_polys[:, :, 0] *= resize_ratio_3_x
+                text_polys[:, :, 1] *= resize_ratio_3_y
+                new_h, new_w, _ = im.shape
 
-                    # text_polys = np.array(text_polys).reshape(-1, 8)
-                    # boxes_mask = np.array([count] * text_polys.shape[0])
-                    # text_label = [text_label[i] for i in selected_poly]
-                    # rectangles = [rectangles[i] for i in selected_poly]
+                score_map, geo_map, training_mask, rbox, rectangles = generate_rbox(im_size=(new_h, new_w), polys=text_polys, tags=text_tags)
 
-                    # filter out bad samples
-                    mask1 = [not (word == [-1]) for word in text_label]
-                    mask2 = [j[1] > 8 and j[0] > 8 for j in [i[2::] for i in rbox[1]]]  # make sure the text is at least 4x4 pixels
-                    mask = [True if i and j else False for (i, j) in zip(mask1, mask2)]
-                    text_label = list(compress(text_label, mask))
-                    rectangles = list(compress(rectangles, mask))
-                    rbox = tuple([list(compress(item, mask)) for item in rbox])
+                # check if score map and geo_map is adjusted properly because the lines do not overlap completely
+                # cv2.imshow('frame', im)
+                # cv2.imshow('frame', score_map*128)
+                # cv2.imshow('frame', geo_map[:, :, 0] * 125)
+                # cv2.imshow('frame', training_mask * 125)
 
-                    assert len(text_label) == len(rectangles)
-                    if len(text_label) == 0:
-                        continue
+                # print rectangles.shape
 
-                    boxes_mask = np.array([count] * len(rectangles))
+                # text_polys = np.array(text_polys).reshape(-1, 8)
+                # boxes_mask = np.array([count] * text_polys.shape[0])
+                # text_label = [text_label[i] for i in selected_poly]
+                # rectangles = [rectangles[i] for i in selected_poly]
 
-                    count += 1
+                # filter out bad samples
+                mask1 = [not (word == [-1]) for word in text_label]
+                mask2 = [j[1] > min_img_box_size and j[0] > min_img_box_size for j in [i[2::] for i in rbox[1]]]  # make sure the text is at least 4x4 pixels
+                mask = [True if i and j else False for (i, j) in zip(mask1, mask2)]
+                text_label = list(compress(text_label, mask))
+                rectangles = list(compress(rectangles, mask))
+                rbox = tuple([list(compress(item, mask)) for item in rbox])
+
+                assert len(text_label) == len(rectangles)
+                if len(text_label) == 0:
+                    continue
+
+                boxes_mask = np.array([count] * len(rectangles))
+                count += 1
 
                 images.append(im.astype(np.float32))  # [:, :, ::-1]
                 image_fns.append(im_fn)
@@ -883,19 +860,10 @@ def generator(input_size=640, batch_size=2, background_ratio=0, random_scale=np.
                     training_masks = []
                     """
                     text_polyses = np.concatenate(text_polyses)
-                    # print "text_polyses: ", text_polyses
-                    # boxes_masks = np.concatenate(boxes_masks)
                     text_tagses = np.concatenate(text_tagses)
                     transform_matrixes, box_widths = get_project_matrix_and_width(text_polyses, text_tagses)
                     # TODO limit the batch size of recognition
                     text_labels_sparse = sparse_tuple_from(np.array(text_labels))
-                    # print "images size: ", len(images)
-                    # print "text labels size: ", len(text_labels)
-                    # print "masks size: ", filter_box_masks.shape
-                    # max_box_widths = max_width * np.ones(filter_box_masks.shape[0])
-
-                    # yield images, image_fns, score_maps, geo_maps, training_masks
-                    # yield images, image_fns, score_maps, geo_maps, training_masks, transform_matrixes, boxes_masks, box_widths, text_labels_sparse,
 
                     yield {'images': np.array(images),
                            'image_fns': np.array(image_fns),

@@ -103,7 +103,7 @@ for x_batch in data_gen:
 # -------- #
 x_batch = data_gen.__next__()
 cv2.imshow('img', cv2.resize(x_batch['images'][0, ::], (512, 512)).astype(np.uint8))
-# cv2.imshow('scr', cv2.resize(x_batch['score_maps'][0, ::]*255, (512, 512)).astype(np.uint8))
+# cv2.imshow('scr', cv2.resize(x_batch['score_maps'][0, ::]*255, (512, 512)).astype(np.uint8))q
 # cv2.imshow('pre', cv2.resize(f_score_[0, ::].numpy()*255, (512, 512)).astype(np.uint8))
 # cv2.imshow('msk', cv2.resize(x_batch['training_masks'][0, ::]*255, (512, 512)).astype(np.uint8))
 # [cv2.imshow(str(i), cv2.resize(geo_score_[0, :, :, i].numpy()*255, (512, 512)).astype(np.uint8)) for i in [0, 1, 2, 3, 4]]
@@ -129,17 +129,29 @@ print([decode_to_text(CHAR_VECTOR, [j for j in i if j != 0]) for i in decoded[:4
 # --------- #
 # DEBUGGING #
 # --------- #
+data_gen = generator(input_size=input_shape[0], batch_size=1, min_img_box_size=30)
+x_batch = data_gen.__next__()
 stride = 4
 shape = tuple([int(i / stride) for i in x_batch['images'].shape[1:3]])
 # shape = x_batch['images'].shape[1:3]
 dummy_input = cv2.resize(x_batch['images'][0, :, :, :].copy(), shape)[np.newaxis, :, :, :]
 RoIrotate_test = RoIRotate(features_stride=stride)
-features, ws = RoIrotate_test(dummy_input, x_batch['rboxes'])
 
-cv2.imshow('org', x_batch['images'][0, :, :, :].astype(np.uint8))
-cv2.imshow('scl', dummy_input[0, :, :, :].astype(np.uint8))
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+import copy
+temp_ = [copy.deepcopy(x_batch['rboxes'][0])]
+# for l, j in zip(temp_[0][0], temp_[0][1]):
+#     m1 = np.amax([60 / l[-2], 1])
+#     m2 = np.amax([35 / l[-1], 1])
+#     l[-1] = int(l[-1] * m1)
+#     l[-2] = int(l[-2] * m2)
+#     j[2:4] = l[2:4]
+
+features, ws = RoIrotate_test(dummy_input, temp_)
+
+# cv2.imshow('org', x_batch['images'][0, :, :, :].astype(np.uint8))
+# cv2.imshow('scl', dummy_input[0, :, :, :].astype(np.uint8))
+# cv2.waitKey(0)
+# cv2.destroyAllWindows()
 
 for i in range(features.shape[0]):
     cv2.imshow('org', x_batch['images'][0, :, :, :].astype(np.uint8))

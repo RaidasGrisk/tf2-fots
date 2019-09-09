@@ -33,18 +33,14 @@ class RoIRotate(object):
         self.ratio = float(self.fix_RoiHeight) / self.max_RoiWidth
 
     def scanFunc(self, state, b_input):
-        # b_input = [ifeatures_tile[0], outBoxes[0], cropBoxes[0], angles[0]]
-        # state = [np.zeros((fix_RoiHeight, max_RoiWidth, channels)), np.array(0, np.int32)]
 
         ifeatures, outBox, cropBox, angle = b_input
         cropFeatures = tf.image.crop_to_bounding_box(ifeatures, outBox[1], outBox[0], outBox[3], outBox[2])
         # cropFeatures.shape
         # plot(cropFeatures.numpy()[0, ::])
-        # rotateCropedFeatures = tf.addons.image.rotate(cropFeatures, angle)
         # rotateCropedFeatures = scipy.ndimage.rotate(cropFeatures, angle*55, axes=(1, 2))
         # rotateCropedFeatures.shape
         # plot(rotateCropedFeatures[0, ::])
-        # crop again to remove new space after rotation
         # textImgFeatures = tf.image.crop_to_bounding_box(rotateCropedFeatures, cropBox[1], cropBox[0], cropBox[3], cropBox[2])
         # textImgFeatures.shape
         # plot(textImgFeatures.numpy()[0, ::])
@@ -69,11 +65,14 @@ class RoIRotate(object):
         # resize keep ratio
         w = tf.cast(tf.math.ceil(tf.multiply(tf.divide(self.fix_RoiHeight, cropBox[3]), tf.cast(cropBox[2], tf.float64))), tf.int32)
         resize_textImgFeatures = tf.image.resize(textImgFeatures, (self.fix_RoiHeight, w))
+        # plot(resize_textImgFeatures[0, ::].numpy())
         w = tf.minimum(w, self.max_RoiWidth)
 
-        # not sure why again???
+        # crop rotated corners
         pad_or_crop_textImgFeatures = tf.image.crop_to_bounding_box(resize_textImgFeatures, 0, 0, self.fix_RoiHeight, w)
+        # plot(pad_or_crop_textImgFeatures[0, ::].numpy())
         pad_or_crop_textImgFeatures = tf.image.pad_to_bounding_box(pad_or_crop_textImgFeatures, 0, 0, self.fix_RoiHeight, self.max_RoiWidth)
+        # plot(pad_or_crop_textImgFeatures[0, ::].numpy())
 
         return [pad_or_crop_textImgFeatures, w]
 
@@ -112,9 +111,11 @@ class RoIRotate(object):
             croped_ft = []
             croped_ft_w = []
             for outB, cropB, ang in zip(outBoxes, cropBoxes, angles):
+
                 out = self.scanFunc(b_input=(ifeatures_pad, outB, cropB, ang), state=[])
                 croped_ft.append(out[0])
                 croped_ft_w.append(out[1])
+
             textImgFeatures = [tf.concat(croped_ft, axis=0), croped_ft_w]
 
             # the below code produces OOM because if there are many boxes,

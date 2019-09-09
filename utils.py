@@ -1,4 +1,5 @@
 import cv2
+import numpy as np
 
 
 def decode_to_text(char_dict, decoded_out):
