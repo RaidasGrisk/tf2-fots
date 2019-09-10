@@ -772,7 +772,7 @@ def generator(input_size=640, batch_size=2, random_scale=np.array([0.8, 0.85, 0.
 
             im_fn = image_list[i]
             im = cv2.imread(im_fn)
-            if not im:
+            if im is None:
                 continue
             h, w, _ = im.shape
 
