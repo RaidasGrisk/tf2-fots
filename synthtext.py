@@ -8,8 +8,6 @@ from shapely.geometry import Polygon
 
 import config
 
-import scipy.io as sio
-
 
 def get_images():
     files = []
@@ -66,7 +64,7 @@ def load_annoataion(p):
             line = line.replace('\xef\xbb\bf', '')
             line = line.replace('\xe2\x80\x8d', '')
             line = line.strip()
-            line = line.split(',')
+            line = line.split(' ')
             if len(line) > 9:
                 label = line[8]
                 for i in range(len(line) - 9):
@@ -74,6 +72,7 @@ def load_annoataion(p):
             else:
                 label = line[-1]
             # label = line[-1]
+            line = [line[0]] + [line[4]] + [line[1]] + [line[5]] + [line[2]] + [line[6]] + [line[3]] + [line[7]]
             temp_line = map(eval, line[:8])
             x1, y1, x2, y2, x3, y3, x4, y4 = map(float, temp_line)
             # x1, y1, x2, y2, x3, y3, x4, y4 = list(map(float, line[:8]))
@@ -746,15 +745,18 @@ def get_project_matrix_and_width(text_polyses, text_tags, target_height=8.0):
     return project_matrixes, box_widths
 
 
-def generator(input_size=640, batch_size=2, random_scale=np.array([0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.2]), min_img_box_size=10, expand_box=0):
+def generator(input_size=640, batch_size=2, random_scale=np.array([0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.2]), min_img_box_size=10):
 
-    dataset = sio.loadmat(config.FLAGS['training_data_path'] + 'gt.mat')
-    image_list = [config.FLAGS['training_data_path'] + i[0] for i in dataset['imnames'][0, :]]
+    with open(config.FLAGS['training_data_path'] + 'path_to_imgs.txt', 'r') as file:
+        image_list = file.readlines()
+        image_list = [config.FLAGS['training_data_path'] + i.replace('\n', '') for i in image_list]
+        file.close()
+
     print('{} training images in {}'.format(len(image_list), config.FLAGS['training_data_path']))
 
     index = np.arange(0, len(image_list))
     while True:
-        # np.random.shuffle(index)
+        np.random.shuffle(index)
         images = []
         image_fns = []
         score_maps = []
@@ -776,22 +778,11 @@ def generator(input_size=640, batch_size=2, random_scale=np.array([0.8, 0.85, 0.
                 continue
             h, w, _ = im.shape
 
-            text_polys = dataset['wordBB'][0, i].copy()  # (2, 4, 13)
-            if len(text_polys.shape) == 2:
-                text_polys = text_polys[:, :, np.newaxis]
-            text_polys = text_polys.transpose([-1, 1, 0])  # (13, 4, 2)
-            text_polys = text_polys + (np.ones_like(text_polys) * np.array([[-expand_box, -expand_box],
-                                                                            [expand_box, -expand_box],
-                                                                            [expand_box, expand_box],
-                                                                            [-expand_box, expand_box]]))
-
-            text_label = []
-            text_tags = []
-            for words in dataset['txt'][0, i]:
-                for word in words.replace(' ', '').split('\n'):
-                    text_label.append(label_to_array(word))
-                    text_tags.append(False)
-
+            txt_fn = config.FLAGS['training_annotation_path'] + image_list[i].split('/')[-1].split('.')[0] + '.txt'
+            try:
+                text_polys, text_tags, text_label = load_annoataion(txt_fn)  # Change for load text transiption
+            except:
+                continue
             text_polys, text_tags = check_and_validate_polys(text_polys, text_tags, (h, w))
 
             # random scale this image

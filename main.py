@@ -16,7 +16,7 @@
 import tensorflow as tf
 import cv2
 import numpy as np
-from icdar import generator
+# from icdar import generator
 from synthtext import generator
 from config import CHAR_VECTOR
 from model_backbone import Backbone
@@ -45,7 +45,7 @@ if load_models:
 max_iter = 10000000
 save_iter = 100
 iter = 0
-data_gen = generator(input_size=input_shape[0], batch_size=1, min_img_box_size=20, expand_box=5)  # 160 / 480 / 640 / 800
+data_gen = generator(input_size=input_shape[0], batch_size=10, min_img_box_size=15)  # 160 / 480 / 640 / 800
 for x_batch in data_gen:
 
     with tf.GradientTape() as tape:
@@ -53,7 +53,7 @@ for x_batch in data_gen:
         # forward-prop
         sharedconv = model_sharedconv(x_batch['images'].copy())
         f_score_, geo_score_ = model_detection(sharedconv)
-        features, ws = model_RoIrotate(sharedconv, x_batch['rboxes'])
+        features, ws = model_RoIrotate(sharedconv, x_batch['rboxes'], expand_px=2)
         logits = model_recognition(features)
 
         # loss
@@ -75,7 +75,7 @@ for x_batch in data_gen:
                                   model_sharedconv.trainable_variables +
                                   model_detection.trainable_variables +
                                   model_recognition.trainable_variables))
-    print(iter, loss_detection.numpy(), loss_recongition.numpy(), x_batch['image_fns'], len(x_batch['rboxes'][0][0]))
+    print(iter, loss_detection.numpy(), loss_recongition.numpy(), len(x_batch['rboxes'][0][0]))
 
     iter += 1
     loss_hist.append([loss_detection.numpy(), loss_recongition.numpy(), model_loss.numpy()])
@@ -130,18 +130,17 @@ print([decode_to_text(CHAR_VECTOR, [j for j in i if j != 0]) for i in decoded[:4
 # --------- #
 # DEBUGGING #
 # --------- #
-data_gen = generator(input_size=input_shape[0], batch_size=1, min_img_box_size=20, expand_box=5)
+data_gen = generator(input_size=input_shape[0], batch_size=1, min_img_box_size=15)
 x_batch = next(data_gen)
-stride = 4
+stride = 1
 shape = tuple([int(i / stride) for i in x_batch['images'].shape[1:3]])
 dummy_input = cv2.resize(x_batch['images'][0, :, :, :].copy(), shape)[np.newaxis, :, :, :]
 RoIrotate_test = RoIRotate(features_stride=stride)
-features, ws = RoIrotate_test(dummy_input, x_batch['rboxes'], plot=True)
+features, ws = RoIrotate_test(dummy_input, x_batch['rboxes'], plot=True, expand_px=2)
 
-# cv2.imshow('org', x_batch['images'][0, :, :, :].astype(np.uint8))
-# cv2.imshow('scl', dummy_input[0, :, :, :].astype(np.uint8))
-# cv2.waitKey(0)
-# cv2.destroyAllWindows()
+cv2.imshow('org', x_batch['images'][0, :, :, :].astype(np.uint8))
+cv2.waitKey(0)
+cv2.destroyAllWindows()
 
 for i in range(features.shape[0]):
     cv2.imshow('org', x_batch['images'][0, :, :, :].astype(np.uint8))
@@ -149,4 +148,3 @@ for i in range(features.shape[0]):
     cv2.imshow(str(i), (features[i, :, :, :].numpy()).astype(np.uint8))
     cv2.waitKey(0)
     cv2.destroyAllWindows()
-

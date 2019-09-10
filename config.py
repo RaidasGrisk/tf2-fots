@@ -10,5 +10,5 @@ FLAGS = {'training_data_path': 'C:/Users/Raidas/Desktop/fots/ICDAR15/ch4_trainin
 
 #synthtext
 FLAGS = {'training_data_path': 'D:/data/SynthText/SynthText/',
-         'training_annotation_path': '',
+         'training_annotation_path': 'D:/data/SynthText/SynthText/annotation/',
          'min_text_size': 0}
