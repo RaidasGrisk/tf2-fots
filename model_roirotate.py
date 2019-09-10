@@ -2,6 +2,8 @@ import tensorflow as tf
 import numpy as np
 import scipy
 import cv2
+from utils import quick_plot
+import math
 
 
 class RoIRotate(object):
@@ -32,10 +34,13 @@ class RoIRotate(object):
         self.fix_RoiHeight = int(32 / features_stride)
         self.ratio = float(self.fix_RoiHeight) / self.max_RoiWidth
 
-    def scanFunc(self, state, b_input):
+    def scanFunc(self, state, b_input, plot=False):
 
         ifeatures, outBox, cropBox, angle = b_input
         cropFeatures = tf.image.crop_to_bounding_box(ifeatures, outBox[1], outBox[0], outBox[3], outBox[2])
+        if plot:
+            for i in cropFeatures:
+                quick_plot(i.numpy())
         # cropFeatures.shape
         # plot(cropFeatures.numpy()[0, ::])
         # rotateCropedFeatures = scipy.ndimage.rotate(cropFeatures, angle*55, axes=(1, 2))
@@ -46,18 +51,18 @@ class RoIRotate(object):
         # plot(textImgFeatures.numpy()[0, ::])
 
         # ------------- #
-        # plot(cropFeatures.numpy()[0, ::])
         _, h, w, c = cropFeatures.shape
-        center = (w/2, h/2)
-        width = cropBox[2]
-        height = cropBox[3]
-        matrix = cv2.getRotationMatrix2D(center=center, angle=angle*60, scale=1)
+        center = (w/2+1, h/2+1)  # adding +1 it just seems to work when dubugging with plot
+        width = cropBox[2]+3  # adding +3 it just seems to work when dubugging with plot
+        height = cropBox[3]+3  # adding +3 it just seems to work when dubugging with plot
+        matrix = cv2.getRotationMatrix2D(center=center, angle=math.degrees(math.atan(angle)), scale=1) # https://stackoverflow.com/questions/10057854/inverse-of-tan-in-python-tan-1
         image = cv2.warpAffine(src=cropFeatures.numpy()[0, :, :, :], M=matrix, dsize=(w, h))
-        # plot(image)
         x = int(center[0] - width / 2)
         y = int(center[1] - height / 2)
-
         textImgFeatures = image[y:y + height, x:x + width, :][np.newaxis, :, :, :]
+        if plot:
+            for i in textImgFeatures:
+                quick_plot(i)
         # plot(image)
 
         # ------------- #
@@ -65,18 +70,22 @@ class RoIRotate(object):
         # resize keep ratio
         w = tf.cast(tf.math.ceil(tf.multiply(tf.divide(self.fix_RoiHeight, cropBox[3]), tf.cast(cropBox[2], tf.float64))), tf.int32)
         resize_textImgFeatures = tf.image.resize(textImgFeatures, (self.fix_RoiHeight, w))
-        # plot(resize_textImgFeatures[0, ::].numpy())
+        if plot:
+            for i in resize_textImgFeatures:
+                quick_plot(i.numpy())
         w = tf.minimum(w, self.max_RoiWidth)
 
         # crop rotated corners
         pad_or_crop_textImgFeatures = tf.image.crop_to_bounding_box(resize_textImgFeatures, 0, 0, self.fix_RoiHeight, w)
         # plot(pad_or_crop_textImgFeatures[0, ::].numpy())
         pad_or_crop_textImgFeatures = tf.image.pad_to_bounding_box(pad_or_crop_textImgFeatures, 0, 0, self.fix_RoiHeight, self.max_RoiWidth)
-        # plot(pad_or_crop_textImgFeatures[0, ::].numpy())
+        if plot:
+            for i in pad_or_crop_textImgFeatures:
+                quick_plot(i.numpy())
 
         return [pad_or_crop_textImgFeatures, w]
 
-    def __call__(self, features, brboxes, expand_w=20):
+    def __call__(self, features, brboxes, expand_w=20, plot=False):
 
         # features = x_batch['images']
         # brboxes = x_batch['rboxes']
@@ -112,7 +121,7 @@ class RoIRotate(object):
             croped_ft_w = []
             for outB, cropB, ang in zip(outBoxes, cropBoxes, angles):
 
-                out = self.scanFunc(b_input=(ifeatures_pad, outB, cropB, ang), state=[])
+                out = self.scanFunc(b_input=(ifeatures_pad, outB, cropB, ang), state=[], plot=plot)
                 croped_ft.append(out[0])
                 croped_ft_w.append(out[1])
 
