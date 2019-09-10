@@ -45,7 +45,7 @@ if load_models:
 max_iter = 10000000
 save_iter = 100
 iter = 0
-data_gen = generator(input_size=input_shape[0], batch_size=1, min_img_box_size=10)  # 160 / 480 / 640 / 800
+data_gen = generator(input_size=input_shape[0], batch_size=1, min_img_box_size=20, expand_box=5)  # 160 / 480 / 640 / 800
 for x_batch in data_gen:
 
     with tf.GradientTape() as tape:
@@ -98,55 +98,55 @@ for x_batch in data_gen:
     if iter == max_iter:
         break
 
-#
-# # -------- #
-# # -------- #
-# # -------- #
-# x_batch = data_gen.__next__()
-# cv2.imshow('img', cv2.resize(x_batch['images'][0, ::], (512, 512)).astype(np.uint8))
-# cv2.imshow('scr', cv2.resize(x_batch['score_maps'][0, ::]*255, (512, 512)).astype(np.uint8))
-# cv2.imshow('pre', cv2.resize(f_score_[0, ::].numpy()*255, (512, 512)).astype(np.uint8))
-# cv2.imshow('msk', cv2.resize(x_batch['training_masks'][0, ::]*255, (512, 512)).astype(np.uint8))
-# [cv2.imshow(str(i), cv2.resize(geo_score_[0, :, :, i].numpy()*255, (512, 512)).astype(np.uint8)) for i in [0, 1, 2, 3, 4]]
+
+# -------- #
+# -------- #
+# -------- #
+x_batch = data_gen.__next__()
+cv2.imshow('img', cv2.resize(x_batch['images'][0, ::], (512, 512)).astype(np.uint8))
+cv2.imshow('scr', cv2.resize(x_batch['score_maps'][0, ::]*255, (512, 512)).astype(np.uint8))
+cv2.imshow('pre', cv2.resize(f_score_[0, ::].numpy()*255, (512, 512)).astype(np.uint8))
+cv2.imshow('msk', cv2.resize(x_batch['training_masks'][0, ::]*255, (512, 512)).astype(np.uint8))
+[cv2.imshow(str(i), cv2.resize(geo_score_[0, :, :, i].numpy()*255, (512, 512)).astype(np.uint8)) for i in [0, 1, 2, 3, 4]]
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+
+# ------- #
+cv2.imshow('i', cv2.resize(x_batch['images'][0, ::], (512, 512)).astype(np.uint8))
+cv2.waitKey(1)
+for i in range(32):
+    cv2.imshow(str(i), cv2.resize(sharedconv[0, :, :, i:i+1].numpy()*255, (512, 512)).astype(np.uint8))
+    cv2.imshow(str(i)+'_crop', (features.numpy() * 255).astype(np.uint8)[0, :, :, i])
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+# ------- #
+decoded, log_prob = tf.nn.ctc_greedy_decoder(logits.numpy().transpose((1, 0, 2)), sequence_length=[64]*logits.shape[0])
+decoded = tf.sparse.to_dense(decoded[0]).numpy()
+print([decode_to_text(CHAR_VECTOR, [j for j in i if j != 0]) for i in decoded[:4, :]])
+
+# ------------------------- #
+
+# --------- #
+# DEBUGGING #
+# --------- #
+data_gen = generator(input_size=input_shape[0], batch_size=1, min_img_box_size=20, expand_box=5)
+x_batch = next(data_gen)
+stride = 4
+shape = tuple([int(i / stride) for i in x_batch['images'].shape[1:3]])
+dummy_input = cv2.resize(x_batch['images'][0, :, :, :].copy(), shape)[np.newaxis, :, :, :]
+RoIrotate_test = RoIRotate(features_stride=stride)
+features, ws = RoIrotate_test(dummy_input, x_batch['rboxes'], plot=True)
+
+# cv2.imshow('org', x_batch['images'][0, :, :, :].astype(np.uint8))
+# cv2.imshow('scl', dummy_input[0, :, :, :].astype(np.uint8))
 # cv2.waitKey(0)
 # cv2.destroyAllWindows()
-#
-# # ------- #
-# cv2.imshow('i', cv2.resize(x_batch['images'][0, ::], (512, 512)).astype(np.uint8))
-# cv2.waitKey(1)
-# for i in range(32):
-#     cv2.imshow(str(i), cv2.resize(sharedconv[0, :, :, i:i+1].numpy()*255, (512, 512)).astype(np.uint8))
-#     cv2.imshow(str(i)+'_crop', (features.numpy() * 255).astype(np.uint8)[0, :, :, i])
-#     cv2.waitKey(0)
-#     cv2.destroyAllWindows()
-#
-# # ------- #
-# decoded, log_prob = tf.nn.ctc_greedy_decoder(logits.numpy().transpose((1, 0, 2)), sequence_length=[64]*logits.shape[0])
-# decoded = tf.sparse.to_dense(decoded[0]).numpy()
-# print([decode_to_text(CHAR_VECTOR, [j for j in i if j != 0]) for i in decoded[:4, :]])
-#
-# # ------------------------- #
-#
-# # --------- #
-# # DEBUGGING #
-# # --------- #
-# data_gen = generator(input_size=input_shape[0], batch_size=1, min_img_box_size=15)
-# x_batch = data_gen.__next__()
-# stride = 4
-# shape = tuple([int(i / stride) for i in x_batch['images'].shape[1:3]])
-# dummy_input = cv2.resize(x_batch['images'][0, :, :, :].copy(), shape)[np.newaxis, :, :, :]
-# RoIrotate_test = RoIRotate(features_stride=stride)
-# features, ws = RoIrotate_test(dummy_input, x_batch['rboxes'], plot=True)
-#
-# # cv2.imshow('org', x_batch['images'][0, :, :, :].astype(np.uint8))
-# # cv2.imshow('scl', dummy_input[0, :, :, :].astype(np.uint8))
-# # cv2.waitKey(0)
-# # cv2.destroyAllWindows()
-#
-# for i in range(features.shape[0]):
-#     cv2.imshow('org', x_batch['images'][0, :, :, :].astype(np.uint8))
-#     cv2.imshow('scl', dummy_input[0, :, :, :].astype(np.uint8))
-#     cv2.imshow(str(i), (features[i, :, :, :].numpy()).astype(np.uint8))
-#     cv2.waitKey(0)
-#     cv2.destroyAllWindows()
-#
+
+for i in range(features.shape[0]):
+    cv2.imshow('org', x_batch['images'][0, :, :, :].astype(np.uint8))
+    cv2.imshow('scl', dummy_input[0, :, :, :].astype(np.uint8))
+    cv2.imshow(str(i), (features[i, :, :, :].numpy()).astype(np.uint8))
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+

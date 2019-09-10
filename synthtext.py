@@ -746,7 +746,7 @@ def get_project_matrix_and_width(text_polyses, text_tags, target_height=8.0):
     return project_matrixes, box_widths
 
 
-def generator(input_size=640, batch_size=2, random_scale=np.array([0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.2]), min_img_box_size=10):
+def generator(input_size=640, batch_size=2, random_scale=np.array([0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.2]), min_img_box_size=10, expand_box=0):
 
     test = sio.loadmat(config.FLAGS['training_data_path'] + 'gt.mat')
 
@@ -777,6 +777,11 @@ def generator(input_size=640, batch_size=2, random_scale=np.array([0.8, 0.85, 0.
             h, w, _ = im.shape
 
             text_polys = test['wordBB'][0, i].transpose([-1, 1, 0])
+            text_polys = text_polys + (np.ones_like(text_polys) * np.array([[-expand_box, -expand_box],
+                                                                            [expand_box, -expand_box],
+                                                                            [expand_box, expand_box],
+                                                                            [-expand_box, expand_box]]))
+
             text_label = []
             text_tags = []
             for words in test['txt'][0, i]:
