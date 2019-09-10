@@ -776,10 +776,10 @@ def generator(input_size=640, batch_size=2, random_scale=np.array([0.8, 0.85, 0.
                 continue
             h, w, _ = im.shape
 
-            text_polys = dataset['wordBB'][0, i]
+            text_polys = dataset['wordBB'][0, i].copy()  # (2, 4, 13)
             if len(text_polys.shape) == 2:
-                text_polys = text_polys[np.newaxis, :, :]
-            text_polys = text_polys.transpose([-1, 1, 0])
+                text_polys = text_polys[:, :, np.newaxis]
+            text_polys = text_polys.transpose([-1, 1, 0])  # (13, 4, 2)
             text_polys = text_polys + (np.ones_like(text_polys) * np.array([[-expand_box, -expand_box],
                                                                             [expand_box, -expand_box],
                                                                             [expand_box, expand_box],
