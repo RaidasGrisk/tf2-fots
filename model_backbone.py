@@ -72,6 +72,8 @@ class Backbone(tf.keras.Model):
         # preprocess input if MobileNet
         if 'mobile' in self.backbone_name.lower():
             input = tf.keras.applications.mobilenet.preprocess_input(input)
+        else:
+            input = tf.keras.applications.resnet50.preprocess_input(input)
 
         layer_1, layer_2, layer_3, layer_4 = self.backbone_layers(input)
 

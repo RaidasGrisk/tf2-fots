@@ -861,14 +861,7 @@ def generator(input_size=640, batch_size=2, random_scale=np.array([0.8, 0.85, 0.
             text_tagses.append(text_tags)
 
             if len(images) == batch_size:
-                """
-                yield images, image_fns, score_maps, geo_maps, training_masks
-                images = []
-                image_fns = []
-                score_maps = []
-                geo_maps = []
-                training_masks = []
-                """
+
                 text_polyses = np.concatenate(text_polyses)
                 text_tagses = np.concatenate(text_tagses)
                 transform_matrixes, box_widths = get_project_matrix_and_width(text_polyses, text_tagses)
@@ -885,6 +878,7 @@ def generator(input_size=640, batch_size=2, random_scale=np.array([0.8, 0.85, 0.
                        'boxes_masks': boxes_masks,
                        'box_widths': box_widths,
                        'text_labels_sparse': text_labels_sparse}
+
                 images = []
                 image_fns = []
                 score_maps = []
