@@ -63,13 +63,13 @@ class Backbone(tf.keras.Model):
 
         self.g1 = tf.keras.layers.Conv2D(filters=32, kernel_size=3, padding='same', activation=tf.nn.relu)
 
-    def __call__(self, input):
+    def call(self, input):
 
-        # layers extracted from Backbone model (REsNet or MobileNet):
+        # layers extracted from Backbone model (ResNet or MobileNet):
         # 1st is the farthest one (near the end of the net),
         # 4th is the closest one (near the beggining)
 
-        # preprocess input if MobileNet
+        # preprocess input
         if 'mobile' in self.backbone_name.lower():
             input = tf.keras.applications.mobilenet.preprocess_input(input)
         else:
@@ -103,3 +103,11 @@ class Backbone(tf.keras.Model):
         layer_1234 = self.g1(layer_1234_conv)
 
         return layer_1234
+
+
+# test
+# model = Backbone()
+# model.build(input_shape=[120, 120, 3])
+# model.summary()
+# for layer in model.layers:
+#     print(layer.output_shape)

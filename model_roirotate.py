@@ -68,7 +68,7 @@ class RoIRotate(object):
         # ------------- #
 
         # resize keep ratio
-        w = tf.cast(tf.math.ceil(tf.multiply(tf.divide(self.fix_RoiHeight, cropBox[3]), tf.cast(cropBox[2], tf.float64))), tf.int32)
+        w = tf.cast(tf.math.ceil(tf.multiply(tf.divide(self.fix_RoiHeight, cropBox[3]+expand_px*4), tf.cast(cropBox[2]+expand_px*4, tf.float64))), tf.int32)
         resize_textImgFeatures = tf.image.resize(textImgFeatures, (self.fix_RoiHeight, w))
         if plot:
             for i in resize_textImgFeatures:
@@ -79,9 +79,9 @@ class RoIRotate(object):
         pad_or_crop_textImgFeatures = tf.image.crop_to_bounding_box(resize_textImgFeatures, 0, 0, self.fix_RoiHeight, w)
         # plot(pad_or_crop_textImgFeatures[0, ::].numpy())
         pad_or_crop_textImgFeatures = tf.image.pad_to_bounding_box(pad_or_crop_textImgFeatures, 0, 0, self.fix_RoiHeight, self.max_RoiWidth)
-        # if plot:
-        #     for i in pad_or_crop_textImgFeatures:
-        #         quick_plot(i.numpy())
+        if plot:
+            for i in pad_or_crop_textImgFeatures:
+                quick_plot(i.numpy())
 
         return [pad_or_crop_textImgFeatures, w]
 

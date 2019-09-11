@@ -40,7 +40,7 @@ class Recognition(tf.keras.Model):
 
         self.dense = tf.keras.layers.Dense(num_classes)  # number of classes + 1 blank char
 
-    def __call__(self, input):
+    def call(self, input):
 
         # cnn
         x = self.layer_1(input)
@@ -72,7 +72,6 @@ class Recognition(tf.keras.Model):
         loss = tf.nn.ctc_loss(labels=y_sparse,
                               logits=tf.transpose(logits, [1, 0, 2]),
                               label_length=label_length,
-                              logit_length=[64 for i in logits],  # len(logits)
-                              blank_index=63)   # len(logits)+1 ?
-
+                              logit_length=[len(logits[-1]) for _ in logits],  # logits [batch, time, nclass]
+                              blank_index=-1)  # -1 will reproduce the behavior of using num_classes-1 for the blank
         return tf.reduce_mean(loss)
