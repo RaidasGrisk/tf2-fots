@@ -13,51 +13,63 @@ class Recognition(tf.keras.Model):
     ++++Shape of logits (2, 64, 46) lstm + fully_connected [b, times, NUM_CLASSES]
     """
 
-    def __init__(self, num_classes, training=True):
+    def __init__(self, num_classes, training=True, drop_prob=0.0):
         super(Recognition, self).__init__()
+        self.drop_prob = drop_prob
+
 
         # cnn
-        self.layer_1 = tf.keras.layers.Conv2D(filters=64, kernel_size=(3, 3), padding="same", activation=tf.nn.relu, dtype='float32')
-        self.layer_2 = tf.keras.layers.MaxPool2D(pool_size=[2, 1], strides=[2, 1])
+        # 1st block
+        self.layer_1 = tf.keras.layers.Conv2D(filters=64, kernel_size=(3, 3), padding='same')
+        self.bn_1 = tf.keras.layers.BatchNormalization(trainable=training, momentum=0.997, epsilon=0.00001)
+        self.pool_1 = tf.keras.layers.MaxPool2D(pool_size=[2, 1], strides=[2, 1], padding='same')
 
-        self.layer_3 = tf.keras.layers.Conv2D(filters=64, kernel_size=(3, 3), padding="same", activation=tf.nn.relu)
-        self.layer_4 = tf.keras.layers.MaxPool2D(pool_size=[2, 1], strides=[2, 1])
+        # 2nd block
+        self.layer_2 = tf.keras.layers.Conv2D(filters=128, kernel_size=(3, 3), padding='same')
+        self.bn_2 = tf.keras.layers.BatchNormalization(trainable=training, momentum=0.997, epsilon=0.00001)
+        self.pool_2 = tf.keras.layers.MaxPool2D(pool_size=[2, 1], strides=[2, 1], padding='same')
 
-        self.layer_5 = tf.keras.layers.Conv2D(filters=256, kernel_size=(3, 3), padding="same")
-        self.layer_6 = tf.keras.layers.BatchNormalization(trainable=training, scale=True)
+        # 3rd block
+        self.layer_3 = tf.keras.layers.Conv2D(filters=256, kernel_size=(3, 3), padding='same')
+        self.bn_3 = tf.keras.layers.BatchNormalization(trainable=training, momentum=0.997, epsilon=0.00001)
+        self.pool_3 = tf.keras.layers.MaxPool2D(pool_size=[2, 1], strides=[2, 1], padding='same')
 
-        self.layer_7 = tf.keras.layers.Conv2D(filters=256, kernel_size=(3, 3), padding="same", activation=tf.nn.relu)
-        self.layer_8 = tf.keras.layers.MaxPool2D(pool_size=[2, 1], strides=[2, 1])
+        # # rnn
+        lstm_fw_cell_1 = tf.keras.layers.LSTM(128, return_sequences=True, unit_forget_bias=True, dropout=self.drop_prob)
+        lstm_bw_cell_1 = tf.keras.layers.LSTM(128, go_backwards=True, return_sequences=True, unit_forget_bias=True, dropout=self.drop_prob)
+        self.bilstm_1 = tf.keras.layers.Bidirectional(layer=lstm_fw_cell_1, backward_layer=lstm_bw_cell_1)
 
-        # rnn
-        lstm_fw_cell_1 = tf.keras.layers.LSTM(126, return_sequences=True, unit_forget_bias=True)
-        lstm_bw_cell_1 = tf.keras.layers.LSTM(126, go_backwards=True, return_sequences=True, unit_forget_bias=True)  # dropout=0.5
-        self.birnn1 = tf.keras.layers.Bidirectional(layer=lstm_fw_cell_1, backward_layer=lstm_bw_cell_1)
-
-        lstm_fw_cell_2 = tf.keras.layers.LSTM(126, return_sequences=True, unit_forget_bias=True)
-        lstm_bw_cell_2 = tf.keras.layers.LSTM(126, go_backwards=True, return_sequences=True, unit_forget_bias=True)  # dropout=0.5
-        self.birnn2 = tf.keras.layers.Bidirectional(layer=lstm_fw_cell_2, backward_layer=lstm_bw_cell_2)
+        lstm_fw_cell_2 = tf.keras.layers.LSTM(128, return_sequences=True, unit_forget_bias=True, dropout=self.drop_prob)
+        lstm_bw_cell_2 = tf.keras.layers.LSTM(128, go_backwards=True, unit_forget_bias=True, return_sequences=True, dropout=self.drop_prob)
+        self.bilstm_2 = tf.keras.layers.Bidirectional(layer=lstm_fw_cell_2, backward_layer=lstm_bw_cell_2)
 
         self.dense = tf.keras.layers.Dense(num_classes)  # number of classes + 1 blank char
 
-    def call(self, input):
+    def __call__(self, input):
 
-        # cnn
+        # 1st block
         x = self.layer_1(input)
-        x = self.layer_2(x)
-        x = self.layer_3(x)
-        x = self.layer_4(x)
-
-        x = self.layer_5(x)
-        x = self.layer_6(x)  # batch norm
+        x = self.bn_1(x)
         x = tf.nn.relu(x)  # activation after bn
-        x = self.layer_7(x)
-        x = self.layer_8(x)
+        x = self.pool_1(x)
+
+        # 2nd block
+        x = self.layer_2(x)
+        x = self.bn_2(x)
+        x = tf.nn.relu(x)
+        x = self.pool_2(x)
+
+        # 3nd block
+        x = self.layer_3(x)
+        x = self.bn_3(x)
+        x = tf.nn.relu(x)
+        x = self.pool_3(x)
 
         # rnn
         x = tf.squeeze(x, axis=[1])  # [BATCH, TIME, FILTERS] because height of tensor is now 1
-        x = self.birnn1(x)
-        x = self.birnn2(x)
+        x = self.bilstm_1(x)
+        x = self.bilstm_2(x)
+        # print([i.sum() for i in x.numpy()])
 
         logits = self.dense(x)
 
@@ -75,3 +87,12 @@ class Recognition(tf.keras.Model):
                               logit_length=[len(logits[-1]) for _ in logits],  # logits [batch, time, nclass]
                               blank_index=-1)  # -1 will reproduce the behavior of using num_classes-1 for the blank
         return tf.reduce_mean(loss)
+
+# # ------- #
+# # import numpy as np
+# #
+# # input = (np.random.randint(1, 10, size=(7, 64, 256)) / 10).astype(np.float32)
+# # tf.keras.layers.LSTM(126, return_sequences=True)(input).shape
+# # tf.keras.layers.LSTM(126, go_backwards=True, return_sequences=True)(input).shape
+# # tf.keras.layers.Bidirectional(layer=tf.keras.layers.LSTM(126, return_sequences=True),
+# #                               backward_layer=tf.keras.layers.LSTM(126, go_backwards=True, return_sequences=True))(input).shape

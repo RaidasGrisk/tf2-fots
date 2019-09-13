@@ -62,13 +62,17 @@ class Backbone(tf.keras.Model):
         self.h2 = tf.keras.layers.Conv2D(filters=64, kernel_size=3, padding='same')
         self.h3 = tf.keras.layers.Conv2D(filters=32, kernel_size=3, padding='same')
 
-        self.bn1 = tf.keras.layers.BatchNormalization(trainable=training)
-        self.bn2 = tf.keras.layers.BatchNormalization(trainable=training)
-        self.bn3 = tf.keras.layers.BatchNormalization(trainable=training)
+        # https://www.tensorflow.org/versions/r2.0/api_docs/python/tf/keras/layers/BatchNormalization
+        # Scale: if True, multiply by gamma. If False, gamma is not used.
+        # When the next layer is linear (also e.g. nn.relu),
+        # this can be disabled since the scaling will be done by the next layer.
+        self.bn1 = tf.keras.layers.BatchNormalization(trainable=training, momentum=0.997, epsilon=0.00001)
+        self.bn2 = tf.keras.layers.BatchNormalization(trainable=training, momentum=0.997, epsilon=0.00001)
+        self.bn3 = tf.keras.layers.BatchNormalization(trainable=training, momentum=0.997, epsilon=0.00001)
 
         self.g1 = tf.keras.layers.Conv2D(filters=32, kernel_size=3, padding='same', activation=tf.nn.relu)
 
-    def call(self, input):
+    def __call__(self, input):
 
         # layers extracted from Backbone model (ResNet or MobileNet):
         # 1st is the farthest one (near the end of the net),

@@ -20,9 +20,9 @@ class Detection(tf.keras.Model):
     def __init__(self):
         super(Detection, self).__init__()
 
-        self.f_score = tf.keras.layers.Conv2D(filters=1, kernel_size=(3, 3), padding='same', activation=tf.nn.sigmoid)
-        self.geo_map = tf.keras.layers.Conv2D(filters=4, kernel_size=(3, 3), padding='same', activation=tf.nn.sigmoid)
-        self.angle_map = tf.keras.layers.Conv2D(filters=1, kernel_size=(3, 3), padding='same', activation=tf.nn.sigmoid)
+        self.f_score = tf.keras.layers.Conv2D(filters=1, kernel_size=(1, 1), padding='same', activation=tf.nn.sigmoid)
+        self.geo_map = tf.keras.layers.Conv2D(filters=4, kernel_size=(1, 1), padding='same', activation=tf.nn.sigmoid)
+        self.angle_map = tf.keras.layers.Conv2D(filters=1, kernel_size=(1, 1), padding='same', activation=tf.nn.sigmoid)
 
     def __call__(self, input):
 
