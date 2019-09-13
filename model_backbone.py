@@ -37,9 +37,10 @@ class Backbone(tf.keras.Model):
 
     """
 
-    def __init__(self, backbone='resnet', input_shape=(480, 640, 3)):
+    def __init__(self, backbone='resnet', input_shape=(640, 640, 3), training=True):
         super(Backbone, self).__init__()
 
+        self.training = training
         self.backbone_name = backbone
         if backbone == 'mobilenet':
             self.baskbone = tf.keras.applications.MobileNetV2(include_top=False, input_shape=input_shape)
@@ -53,13 +54,17 @@ class Backbone(tf.keras.Model):
             inputs=self.baskbone.input,
             outputs=[self.baskbone.get_layer(index=i).output for i in self.layer_ids])
 
-        self.l1 = tf.keras.layers.Conv2D(filters=128, kernel_size=1, padding='same', activation=tf.nn.relu)
-        self.l2 = tf.keras.layers.Conv2D(filters=64, kernel_size=1, padding='same', activation=tf.nn.relu)
-        self.l3 = tf.keras.layers.Conv2D(filters=32, kernel_size=1, padding='same', activation=tf.nn.relu)
+        self.l1 = tf.keras.layers.Conv2D(filters=128, kernel_size=1, padding='same')
+        self.l2 = tf.keras.layers.Conv2D(filters=64, kernel_size=1, padding='same')
+        self.l3 = tf.keras.layers.Conv2D(filters=32, kernel_size=1, padding='same')
 
-        self.h1 = tf.keras.layers.Conv2D(filters=128, kernel_size=3, padding='same', activation=tf.nn.relu)
-        self.h2 = tf.keras.layers.Conv2D(filters=64, kernel_size=3, padding='same', activation=tf.nn.relu)
-        self.h3 = tf.keras.layers.Conv2D(filters=32, kernel_size=3, padding='same', activation=tf.nn.relu)
+        self.h1 = tf.keras.layers.Conv2D(filters=128, kernel_size=3, padding='same')
+        self.h2 = tf.keras.layers.Conv2D(filters=64, kernel_size=3, padding='same')
+        self.h3 = tf.keras.layers.Conv2D(filters=32, kernel_size=3, padding='same')
+
+        self.bn1 = tf.keras.layers.BatchNormalization(trainable=training)
+        self.bn2 = tf.keras.layers.BatchNormalization(trainable=training)
+        self.bn3 = tf.keras.layers.BatchNormalization(trainable=training)
 
         self.g1 = tf.keras.layers.Conv2D(filters=32, kernel_size=3, padding='same', activation=tf.nn.relu)
 
@@ -86,6 +91,8 @@ class Backbone(tf.keras.Model):
         # layer_1 + layer_2 -> layer_12
         layer_12_conc = self.l1(tf.concat([layer_1, layer_2], axis=-1))
         layer_12_conv = self.h1(layer_12_conc)
+        layer_12_conv = self.bn1(layer_12_conv)
+        layer_12_conv = tf.nn.relu(layer_12_conv)
         layer_shape = tf.shape(layer_2)
         layer_12 = tf.image.resize(layer_12_conv, size=[layer_shape[1] * 2, layer_shape[2] * 2])
 
@@ -93,6 +100,8 @@ class Backbone(tf.keras.Model):
         # layer_12 + layer_3 -> layer_123
         layer_123_conc = self.l2(tf.concat([layer_12, layer_3], axis=-1))
         layer_123_conv = self.h2(layer_123_conc)
+        layer_123_conv = self.bn2(layer_123_conv)
+        layer_123_conv = tf.nn.relu(layer_123_conv)
         layer_shape = tf.shape(layer_3)
         layer_123 = tf.image.resize(layer_123_conv, size=[layer_shape[1] * 2, layer_shape[2] * 2])
 
@@ -100,6 +109,9 @@ class Backbone(tf.keras.Model):
         # layer_123 + layer_4 -> layer_1234
         layer_1234_conc = self.l3(tf.concat([layer_123, layer_4], axis=-1))
         layer_1234_conv = self.h3(layer_1234_conc)
+        layer_1234_conv = self.bn3(layer_1234_conv)
+        layer_1234_conv = tf.nn.relu(layer_1234_conv)
+
         layer_1234 = self.g1(layer_1234_conv)
 
         return layer_1234

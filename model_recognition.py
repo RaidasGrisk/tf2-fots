@@ -24,18 +24,18 @@ class Recognition(tf.keras.Model):
         self.layer_4 = tf.keras.layers.MaxPool2D(pool_size=[2, 1], strides=[2, 1])
 
         self.layer_5 = tf.keras.layers.Conv2D(filters=256, kernel_size=(3, 3), padding="same")
-        self.layer_6 = tf.keras.layers.BatchNormalization(trainable=training)
+        self.layer_6 = tf.keras.layers.BatchNormalization(trainable=training, scale=True)
 
         self.layer_7 = tf.keras.layers.Conv2D(filters=256, kernel_size=(3, 3), padding="same", activation=tf.nn.relu)
         self.layer_8 = tf.keras.layers.MaxPool2D(pool_size=[2, 1], strides=[2, 1])
 
         # rnn
-        lstm_fw_cell_1 = tf.keras.layers.LSTM(126, return_sequences=True)
-        lstm_bw_cell_1 = tf.keras.layers.LSTM(126, go_backwards=True, return_sequences=True)
+        lstm_fw_cell_1 = tf.keras.layers.LSTM(126, return_sequences=True, unit_forget_bias=True)
+        lstm_bw_cell_1 = tf.keras.layers.LSTM(126, go_backwards=True, return_sequences=True, unit_forget_bias=True)  # dropout=0.5
         self.birnn1 = tf.keras.layers.Bidirectional(layer=lstm_fw_cell_1, backward_layer=lstm_bw_cell_1)
 
-        lstm_fw_cell_2 = tf.keras.layers.LSTM(126, return_sequences=True)
-        lstm_bw_cell_2 = tf.keras.layers.LSTM(126, go_backwards=True, return_sequences=True)
+        lstm_fw_cell_2 = tf.keras.layers.LSTM(126, return_sequences=True, unit_forget_bias=True)
+        lstm_bw_cell_2 = tf.keras.layers.LSTM(126, go_backwards=True, return_sequences=True, unit_forget_bias=True)  # dropout=0.5
         self.birnn2 = tf.keras.layers.Bidirectional(layer=lstm_fw_cell_2, backward_layer=lstm_bw_cell_2)
 
         self.dense = tf.keras.layers.Dense(num_classes)  # number of classes + 1 blank char
