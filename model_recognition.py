@@ -43,6 +43,9 @@ class Recognition(tf.keras.Model):
         lstm_bw_cell_2 = tf.keras.layers.LSTM(128, go_backwards=True, unit_forget_bias=True, return_sequences=True, dropout=self.drop_prob)
         self.bilstm_2 = tf.keras.layers.Bidirectional(layer=lstm_fw_cell_2, backward_layer=lstm_bw_cell_2)
 
+        # From the paper: To avoid overfitting on small training datasets
+        # like ICDAR 2015, we add dropout before fully-connection.
+        # https://www.tensorflow.org/versions/r2.0/api_docs/python/tf/keras/layers/Dropout
         self.dense = tf.keras.layers.Dense(num_classes)  # number of classes + 1 blank char
 
     def __call__(self, input):
