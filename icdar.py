@@ -20,7 +20,7 @@ def get_images():
 def label_to_array(label):
     try:
         label = label.replace(' ', '')
-        return [config.CHAR_VECTOR.index(x) if x in config.CHAR_VECTOR else len(config.CHAR_VECTOR)-1 for x in label]
+        return [config.CHAR_VECTOR.index(x) if x in config.CHAR_VECTOR else len(config.CHAR_VECTOR)+1 for x in label]
     except Exception as ex:
         print(label)
         raise ex
@@ -547,7 +547,7 @@ def generate_roiRotatePara(box, angle, expand_w=60):
     return bbox.astype(np.int32).tolist(), rrect.astype(np.int32).tolist(), -angle
 
 
-def generate_rbox(im_size, polys, tags):
+def generate_rbox(im_size, polys, tags, min_text_size):
     h, w = im_size
     poly_mask = np.zeros((h, w), dtype=np.uint8)
     score_map = np.zeros((h, w), dtype=np.uint8)
@@ -578,7 +578,7 @@ def generate_rbox(im_size, polys, tags):
         # if the poly is too small, then ignore it during training
         poly_h = min(np.linalg.norm(poly[0] - poly[3]), np.linalg.norm(poly[1] - poly[2]))
         poly_w = min(np.linalg.norm(poly[0] - poly[1]), np.linalg.norm(poly[2] - poly[3]))
-        if min(poly_h, poly_w) < config.FLAGS['min_text_size']:
+        if min(poly_h, poly_w) < min_text_size:
             training_mask = cv2.fillPoly(training_mask, poly.astype(np.int32)[np.newaxis, :, :], 0)
         if tag:
             training_mask = cv2.fillPoly(training_mask, poly.astype(np.int32)[np.newaxis, :, :], 0)
@@ -744,7 +744,7 @@ def get_project_matrix_and_width(text_polyses, text_tags, target_height=8.0):
     return project_matrixes, box_widths
 
 
-def generator(input_size=640, batch_size=2, random_scale=np.array([0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.2]), min_img_box_size=10):
+def generator(input_size=640, batch_size=2, random_scale=np.array([2.0, 2.5, 3.0, 3.5, 4.0]), min_text_size=10):
 
     image_list = np.array(get_images())
     print('{} training images in {}'.format(image_list.shape[0], config.FLAGS['training_data_path']))
@@ -784,7 +784,7 @@ def generator(input_size=640, batch_size=2, random_scale=np.array([0.8, 0.85, 0.
                 # print rd_scale
                 # random crop a area from image
 
-                # Third 640×640 random samples are cropped. Here it is little diffrent from paper
+                # Third 640×640 random samples are cropped.
                 text_polys_, selected_polys_ = np.array([]), np.array([])
                 while text_polys_.shape[0] == 0 or len(selected_polys_) == 0:
                     im_, text_polys_, text_tags_, selected_polys_ = crop_area(im, text_polys, text_tags, text_label)
@@ -808,7 +808,7 @@ def generator(input_size=640, batch_size=2, random_scale=np.array([0.8, 0.85, 0.
                 text_polys[:, :, 1] *= resize_ratio_3_y
                 new_h, new_w, _ = im.shape
 
-                score_map, geo_map, training_mask, rbox, rectangles = generate_rbox(im_size=(new_h, new_w), polys=text_polys, tags=text_tags)
+                score_map, geo_map, training_mask, rbox, rectangles = generate_rbox(im_size=(new_h, new_w), polys=text_polys, tags=text_tags, min_text_size=min_text_size)
 
                 # check if score map and geo_map is adjusted properly because the lines do not overlap completely
                 # cv2.imshow('frame', im)
@@ -825,7 +825,7 @@ def generator(input_size=640, batch_size=2, random_scale=np.array([0.8, 0.85, 0.
 
                 # filter out bad samples
                 mask1 = [not (word == [-1]) for word in text_label]
-                mask2 = [j[1] > min_img_box_size and j[0] > min_img_box_size for j in [i[2::] for i in rbox[1]]]  # make sure the text is at least 4x4 pixels
+                mask2 = [j[1] > min_text_size and j[0] > min_text_size for j in [i[2::] for i in rbox[1]]]  # make sure the text is at least 4x4 pixels
                 mask = [True if i and j else False for (i, j) in zip(mask1, mask2)]
                 text_label = list(compress(text_label, mask))
                 rectangles = list(compress(rectangles, mask))
