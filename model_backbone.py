@@ -89,7 +89,7 @@ class Backbone(tf.keras.Model):
         # step 1
         # layer_1 -> layer_1
         layer_shape = tf.shape(layer_1)
-        layer_1 = tf.image.resize(layer_1, size=[layer_shape[1] * 2, layer_shape[2] * 2])
+        layer_1 = tf.keras.layers.UpSampling2D(size=[2, 2])(layer_1)
 
         # step 2
         # layer_1 + layer_2 -> layer_12
@@ -97,8 +97,7 @@ class Backbone(tf.keras.Model):
         layer_12_conv = self.h1(layer_12_conc)
         layer_12_conv = self.bn1(layer_12_conv)
         layer_12_conv = tf.nn.relu(layer_12_conv)
-        layer_shape = tf.shape(layer_2)
-        layer_12 = tf.image.resize(layer_12_conv, size=[layer_shape[1] * 2, layer_shape[2] * 2])
+        layer_12 = tf.keras.layers.UpSampling2D(size=[2, 2])(layer_12_conv)
 
         # step 3
         # layer_12 + layer_3 -> layer_123
@@ -106,8 +105,7 @@ class Backbone(tf.keras.Model):
         layer_123_conv = self.h2(layer_123_conc)
         layer_123_conv = self.bn2(layer_123_conv)
         layer_123_conv = tf.nn.relu(layer_123_conv)
-        layer_shape = tf.shape(layer_3)
-        layer_123 = tf.image.resize(layer_123_conv, size=[layer_shape[1] * 2, layer_shape[2] * 2])
+        layer_123 = tf.keras.layers.UpSampling2D(size=[2, 2])(layer_123_conv)
 
         # step 4
         # layer_123 + layer_4 -> layer_1234
@@ -128,10 +126,10 @@ class Backbone(tf.keras.Model):
 # for layer in model.layers:
 #     print(layer.output_shape)
 
-# ------------ #
+#------------ #
 # baskbone = tf.keras.applications.MobileNetV2(include_top=False, input_shape=(640, 640, 3))
 # layer_ids = [149, 69, 39, 24]
-
+#
 # for id, _ in enumerate(baskbone.layers):
 #     layer = baskbone.layers[id]
 #     weight_shape = [list(w.shape) for w in layer.weights]
