@@ -20,7 +20,7 @@ def get_images():
 def label_to_array(label):
     try:
         label = label.replace(' ', '')
-        return [config.CHAR_VECTOR.index(x) if x in config.CHAR_VECTOR else len(config.CHAR_VECTOR)+1 for x in label]
+        return [config.CHAR_VECTOR.index(x) if x in config.CHAR_VECTOR else len(config.CHAR_VECTOR)-1 for x in label]
     except Exception as ex:
         print(label)
         raise ex

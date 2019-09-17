@@ -44,7 +44,7 @@ class Backbone(tf.keras.Model):
         self.backbone_name = backbone
         if backbone == 'mobilenet':
             self.baskbone = tf.keras.applications.MobileNetV2(include_top=False, input_shape=input_shape)
-            self.layer_ids = [149, 69, 39, 24]
+            self.layer_ids = [154, 119, 57, 30]
         else:
             self.baskbone = tf.keras.applications.ResNet50(include_top=False, input_shape=input_shape)
             self.layer_ids = [174, 142, 80, 12]
@@ -127,3 +127,20 @@ class Backbone(tf.keras.Model):
 # model.summary()
 # for layer in model.layers:
 #     print(layer.output_shape)
+
+# ------------ #
+# baskbone = tf.keras.applications.MobileNetV2(include_top=False, input_shape=(640, 640, 3))
+# layer_ids = [149, 69, 39, 24]
+
+# for id, _ in enumerate(baskbone.layers):
+#     layer = baskbone.layers[id]
+#     weight_shape = [list(w.shape) for w in layer.weights]
+#     print(id, layer.name, layer.input_shape, layer.output_shape, weight_shape)
+#     if '_add' in layer.name:
+#         print(layer.input)
+
+# 30:  block1+block2 [CH 24] + expand 144, bn, relu --> [160, 160, 144]
+# 57:  block4+block5 [CH 32] + expand 192, bn, relu --> [80,  80,  192] (block4=block3+block4)
+# 119: 11 + 12                                      --> [40,  40,  576]
+# 154  14 + 15                                      --> [20,  20,  1280]
+# [30, 57, 119, 154]
