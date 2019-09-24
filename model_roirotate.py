@@ -35,6 +35,7 @@ class RoIRotate(object):
         self.fix_RoiHeight = int(32 / features_stride)
         self.ratio = float(self.fix_RoiHeight) / self.max_RoiWidth
 
+    @tf.function
     def scanFunc(self, state, b_input, plot=False, expand_px=0):
 
         ifeatures, outBox, cropBox, angle = b_input
