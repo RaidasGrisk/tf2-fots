@@ -1,4 +1,5 @@
 import tensorflow as tf
+import tensorflow_addons as tfa
 import numpy as np
 import scipy
 import cv2
@@ -51,17 +52,20 @@ class RoIRotate(object):
         # plot(textImgFeatures.numpy()[0, ::])
 
         # ------------- #
-        _, h, w, c = cropFeatures.shape
-        center = (w/2+expand_px, h/2+expand_px)
-        width = cropBox[2]+expand_px*4
-        height = cropBox[3]+expand_px*4
-        matrix = cv2.getRotationMatrix2D(center=center, angle=math.degrees(math.atan(angle)), scale=1) # https://stackoverflow.com/questions/10057854/inverse-of-tan-in-python-tan-1
-        image = cv2.warpAffine(src=cropFeatures.numpy()[0, :, :, :], M=matrix, dsize=(w, h))
-        x = int(center[0] - width / 2)
-        y = int(center[1] - height / 2)
-        textImgFeatures = image[y:y + height, x:x + width, :][np.newaxis, :, :, :]
+        # _, h, w, c = cropFeatures.shape
+        # center = (w/2+expand_px, h/2+expand_px)
+        # width = cropBox[2]+expand_px*4
+        # height = cropBox[3]+expand_px*4
+        # matrix = cv2.getRotationMatrix2D(center=center, angle=math.degrees(math.atan(angle)), scale=1) # https://stackoverflow.com/questions/10057854/inverse-of-tan-in-python-tan-1
+        # image = cv2.warpAffine(src=cropFeatures.numpy()[0, :, :, :], M=matrix, dsize=(w, h))
+        # x = int(center[0] - width / 2)
+        # y = int(center[1] - height / 2)
+        # textImgFeatures = image[y:y + height, x:x + width, :][np.newaxis, :, :, :]
+
+        textImgFeatures = tfa.image.rotate(cropFeatures, angles=angle)
+
         if plot:
-            for i in textImgFeatures:
+            for i in textImgFeatures.numpy():
                 quick_plot(i)
         # plot(image)
 
