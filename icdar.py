@@ -750,7 +750,7 @@ def generator(input_size=640, batch_size=2, random_scale=np.array([2.0, 2.5, 3.0
     print('{} training images in {}'.format(image_list.shape[0], config.FLAGS['training_data_path']))
     index = np.arange(0, image_list.shape[0])
     while True:
-        # np.random.shuffle(index)
+        index = np.random.shuffle(index)
         images = []
         image_fns = []
         score_maps = []
