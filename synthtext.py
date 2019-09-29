@@ -754,6 +754,20 @@ def generator(input_size=640, batch_size=2, random_scale=np.array([0.8, 0.85, 0.
 
     print('{} training images in {}'.format(len(image_list), config.FLAGS['training_data_path']))
 
+    # filter image_list if some images are not available
+    # ---- #
+    empty_dirs = []
+    _, direcotries, files = next(os.walk(config.FLAGS['training_data_path']))
+    for dir in direcotries:
+        files_in_dir = os.listdir(config.FLAGS['training_data_path'] + dir)
+        if len(files_in_dir) < 10:
+            empty_dirs.append(dir)
+    for img in image_list:
+        if img.split('/')[-2] in empty_dirs:
+            image_list.remove(img)
+    print('{} training images in {}'.format(len(image_list), config.FLAGS['training_data_path']))
+    # ---- #
+    
     index = np.arange(0, len(image_list))
     while True:
         np.random.shuffle(index)
