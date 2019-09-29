@@ -757,10 +757,13 @@ def generator(input_size=640, batch_size=2, random_scale=np.array([0.8, 0.85, 0.
     # filter image_list if some images are not available
     # ---- #
     empty_dirs = []
-    _, direcotries, files = next(os.walk(config.FLAGS['training_data_path']))
-    for dir in direcotries:
-        files_in_dir = os.listdir(config.FLAGS['training_data_path'] + dir)
-        if len(files_in_dir) < 10:
+    directories = [str(dir) for dir in range(1, 201)]
+    for dir in directories:
+        if os.path.exists(config.FLAGS['training_data_path'] + dir):
+            files_in_dir = os.listdir(config.FLAGS['training_data_path'] + dir)
+            if len(files_in_dir) < 10:
+                empty_dirs.append(dir)
+        else:
             empty_dirs.append(dir)
     for img in image_list:
         if img.split('/')[-2] in empty_dirs:
