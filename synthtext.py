@@ -773,7 +773,7 @@ def generator(input_size=640, batch_size=2, random_scale=np.array([0.8, 0.85, 0.
     
     with open(config.FLAGS['training_data_path'] + 'path_to_imgs.txt', 'r') as file:
         image_list = file.readlines()
-        image_list = [config.FLAGS['training_data_path'] + i.replace('\n', '') for i in image_list if i.split('/')[-2] not in empty_dirs]
+        image_list = [config.FLAGS['training_data_path'] + i.replace('\n', '') for i in image_list if i.replace('\n', '').split('/')[-2] not in empty_dirs]
         file.close()
 
     print('{} training images in {}'.format(len(image_list), config.FLAGS['training_data_path']))
