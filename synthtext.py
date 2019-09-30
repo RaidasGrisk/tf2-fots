@@ -747,13 +747,7 @@ def get_project_matrix_and_width(text_polyses, text_tags, target_height=8.0):
 
 def generator(input_size=640, batch_size=2, random_scale=np.array([0.8, 0.85, 0.9, 0.95, 1.0, 1.1, 1.2]), min_text_size=10):
 
-    with open(config.FLAGS['training_data_path'] + 'path_to_imgs.txt', 'r') as file:
-        image_list = file.readlines()
-        image_list = [config.FLAGS['training_data_path'] + i.replace('\n', '') for i in image_list]
-        file.close()
-
-    print('{} training images in {}'.format(len(image_list), config.FLAGS['training_data_path']))
-
+    
     # filter image_list if some images are not available
     # ---- #
     empty_dirs = []
@@ -769,13 +763,21 @@ def generator(input_size=640, batch_size=2, random_scale=np.array([0.8, 0.85, 0.
         else:
             empty_dirs.append(dir)
             print('dir {} does not exist'.format(dir))
-    for img in image_list:
-        if img.split('/')[-2] in empty_dirs:
-            print('img does not exist {} removing'.format(img))
-            image_list.remove(img)
-    print('{} training images in {}'.format(len(image_list), config.FLAGS['training_data_path']))
+#     for img in image_list:
+#         if img.split('/')[-2] in empty_dirs:
+#             print('img does not exist {} removing'.format(img))
+#             image_list.remove(img)
+#     print('{} training images in {}'.format(len(image_list), config.FLAGS['training_data_path']))
     # ---- #
     
+    
+    with open(config.FLAGS['training_data_path'] + 'path_to_imgs.txt', 'r') as file:
+        image_list = file.readlines()
+        image_list = [config.FLAGS['training_data_path'] + i.replace('\n', '') for i in image_list if i.split('/')[-2] not in empty_dirs]
+        file.close()
+
+    print('{} training images in {}'.format(len(image_list), config.FLAGS['training_data_path']))
+
     index = np.arange(0, len(image_list))
     while True:
         np.random.shuffle(index)
