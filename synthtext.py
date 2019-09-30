@@ -759,14 +759,19 @@ def generator(input_size=640, batch_size=2, random_scale=np.array([0.8, 0.85, 0.
     empty_dirs = []
     directories = [str(dir) for dir in range(1, 201)]
     for dir in directories:
+        print('checking dir {}'.format(dir))
         if os.path.exists(config.FLAGS['training_data_path'] + dir):
             files_in_dir = os.listdir(config.FLAGS['training_data_path'] + dir)
+            print('dir {} exists'.format(dir))
             if len(files_in_dir) < 10:
                 empty_dirs.append(dir)
+                print('dir {} contains <10 less files'.format(dir))
         else:
             empty_dirs.append(dir)
+            print('dir {} does not exist'.format(dir))
     for img in image_list:
         if img.split('/')[-2] in empty_dirs:
+            print('img does not exist {} removing'.format(img))
             image_list.remove(img)
     print('{} training images in {}'.format(len(image_list), config.FLAGS['training_data_path']))
     # ---- #
