@@ -1,6 +1,8 @@
 # tf2-fots
 
-In progress
+In progress. Current state:
+
+![Loss](misc/loss.bmp?raw=true)
 
 # TODO
 
@@ -9,15 +11,16 @@ In progress
 - [x] RoI rotate part
 - [x] Text recognition part
 - [x] Data generation
+- [ ] Fix detection box bug during inference
 
-All of the above are now in place. The problem is the code is still very messy and poorly structured.
+The problem is the code is still very messy and poorly structured.
 Given that the main project pipeline is working, next steps are:
 
-- [ ] Clean and structure the code
+- [ ] Clean and restructure the code
 - [ ] See if RoiRotatePart can be improved using affine transformation
 
 Once above is finished:
 
-- [ ] Data augmentation
+- [ ] Explore data augmentation
 - [ ] Training/testing pipelines
 - [ ] Documentation
