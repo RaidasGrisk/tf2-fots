@@ -13,7 +13,7 @@ In progress. Current state:
 - [x] Data generation
 - [ ] Fix detection box bug during inference
 
-The problem is the code is still very messy and poorly structured.
+The problem is the code is still very messy and poorly structured.  
 Given that the main project pipeline is working, next steps are:
 
 - [ ] Clean and restructure the code
