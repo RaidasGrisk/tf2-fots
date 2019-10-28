@@ -4,6 +4,10 @@ In progress. Current state:
 
 ![Loss](misc/loss.bmp?raw=true)
 
+The loss of detection part started to flatten,  
+so I increased the relative size of gradients of this branch.  
+That is why the sudden drop in detection loss.
+
 # TODO
 
 - [x] Resnet50 feature extraction + fusion
