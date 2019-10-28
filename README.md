@@ -6,6 +6,8 @@ In progress. Current state:
 
 The loss of detection part started to flatten,  
 so I increased the relative size of gradients of this branch.  
+So far it looks like this does not hurt the recognition loss  
+and detection loss is decreasing much faster.
 That is why the sudden drop in detection loss.
 
 # TODO
