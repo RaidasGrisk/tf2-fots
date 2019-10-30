@@ -5,10 +5,13 @@ In progress. Current state:
 ![Loss](misc/loss.bmp?raw=true)
 
 The loss of detection part started to flatten,  
-so I increased the relative size of gradients of this branch.  
-So far it looks like this does not hurt the recognition loss  
-and detection loss is decreasing much faster.  
-That is why the sudden drop in detection loss.
+so I experimented with the relative weights of  
+losses from both branches when computing grads.  
+
+This results in shifting the trade-off between  
+what will the model learn more: detect or recognize.  
+That is why the sudden drop in detection loss.  
+
 
 # TODO
 
