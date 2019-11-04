@@ -15,7 +15,7 @@ That is why the sudden drop in detection loss.
 
 # TODO
 
-- [x] Resnet50 feature extraction + fusion
+- [x] Backbone model (resnet/mobilenet) feature extraction + fusion
 - [x] Text detection part
 - [x] RoI rotate part
 - [x] Text recognition part
