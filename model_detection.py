@@ -61,7 +61,7 @@ class Detection(tf.keras.Model):
                                                    f_score_ * training_mask,
                                                    from_logits=False,
                                                    label_smoothing=0)
-        return tf.reduce_mean(loss, axis=(-1, -2))
+        return tf.reduce_mean(loss)
     
     @staticmethod
     def loss_regression(geo_score, geo_score_):
@@ -89,4 +89,4 @@ class Detection(tf.keras.Model):
 
         loss_clasification = self.loss_classification2(f_score, f_score_, training_mask)
         loss_regression = self.loss_regression(geo_score, geo_score_)
-        return tf.reduce_mean(loss_regression * f_score * training_mask) + loss_clasification * 0.01  # 1 in paper?
+        return tf.reduce_mean(loss_regression * f_score * training_mask) + loss_clasification * 1  #0.01  # 1 in paper?
