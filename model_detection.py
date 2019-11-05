@@ -48,6 +48,22 @@ class Detection(tf.keras.Model):
         return loss
 
     @staticmethod
+    def loss_classification2(f_score, f_score_, training_mask):
+        """
+        cross enthropy
+        :param f_score: ground truth of text
+        :param f_score_: prediction os text
+        :param training_mask: mask used in training, to ignore some text annotated by ###
+                :return:
+        """
+
+        loss = tf.keras.losses.binary_crossentropy(f_score * training_mask,
+                                                   f_score_ * training_mask,
+                                                   from_logits=False,
+                                                   label_smoothing=0)
+        return tf.reduce_mean(loss, axis=(-1, -2))
+    
+    @staticmethod
     def loss_regression(geo_score, geo_score_):
         """
         :param geo_score: ground truth of geometry
@@ -71,6 +87,6 @@ class Detection(tf.keras.Model):
 
     def loss_detection(self, f_score, f_score_, geo_score, geo_score_, training_mask):
 
-        loss_clasification = self.loss_classification(f_score, f_score_, training_mask)
+        loss_clasification = self.loss_classification2(f_score, f_score_, training_mask)
         loss_regression = self.loss_regression(geo_score, geo_score_)
         return tf.reduce_mean(loss_regression * f_score * training_mask) + loss_clasification * 0.01  # 1 in paper?
