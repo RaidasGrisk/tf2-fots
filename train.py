@@ -48,7 +48,7 @@ model_sharedconv = Backbone(backbone='mobilenet', input_shape=input_shape)
 model_detection = Detection()
 model_RoIrotate = RoIRotate(tfa_enabled=tfa_enabled)
 model_recognition = Recognition(num_classes=len(CHAR_VECTOR)+1, training=True, drop_prob=0.001)
-optimizer = tf.keras.optimizers.Adam(learning_rate=0.001)
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)
 save_iter = 100
 iter = 0
 
