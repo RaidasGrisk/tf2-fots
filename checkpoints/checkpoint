@@ -1,0 +1,2 @@
+model_checkpoint_path: "recognition"
+all_model_checkpoint_paths: "recognition"
