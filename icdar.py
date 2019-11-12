@@ -772,7 +772,7 @@ def generator(input_size=640, batch_size=2, random_scale=np.array([2.0, 2.5, 3.0
                 child_name = im_fn.replace(os.path.basename(im_fn).split('.')[1], 'txt').split('/')[-1].split('\\')[-1]
                 txt_fn = config.FLAGS['training_annotation_path'] + '/gt_' + child_name
 
-                text_polys, text_tags, text_label = load_annoataion(txt_fn)  # Change for load text transiption
+                text_polys, text_tags, text_label = load_annoataion(txt_fn)
                 text_polys, text_tags = check_and_validate_polys(text_polys, text_tags, (h, w))
 
                 # random scale this image

@@ -45,18 +45,17 @@ class RoIRotate(object):
 
     # decorating this with tf.function() throws an error: OSError: could not get source code
     # not sure why this went wrong as I've been using it with decoration previously
-    # @tf.function()
-    def scanFunc(self, state, b_input, plot=False, expand_px=0):
+    # works fine on linux (because of tfa_enabled), does not work on windows
+    @tf.function()
+    def scanFunc(self, b_input, plot=False, expand_px=0):
 
         ifeatures, outBox, cropBox, angle = b_input
         # make sure box size is within image
         _, height, width, _ = ifeatures.shape
         offset_height = outBox[1]-expand_px
         offset_width = outBox[0]-expand_px
-        target_height = outBox[3]+expand_px*2
-        target_width = outBox[2]+expand_px*2
-        target_height = np.clip(outBox[3]+expand_px, 1, height - outBox[1]-expand_px)
-        target_width = np.clip(outBox[2]+expand_px, 1, width - outBox[0]-expand_px)
+        target_height = tf.clip_by_value(outBox[3]+expand_px, 1, height - outBox[1]-expand_px)
+        target_width = tf.clip_by_value(outBox[2]+expand_px, 1, width - outBox[0]-expand_px)
 
         cropFeatures = tf.image.crop_to_bounding_box(ifeatures, offset_height, offset_width, target_height, target_width)
         if plot:
@@ -79,7 +78,6 @@ class RoIRotate(object):
         if plot:
             for i in textImgFeatures.numpy():
                 quick_plot(i)
-        # plot(image)
 
         # ------------- #
 
@@ -134,7 +132,7 @@ class RoIRotate(object):
             croped_ft = []
             croped_ft_w = []
             for outB, cropB, ang in zip(outBoxes, cropBoxes, angles):
-                out = self.scanFunc(b_input=(ifeatures_pad, outB, cropB, ang), state=[], plot=plot, expand_px=expand_px)
+                out = self.scanFunc(b_input=(ifeatures_pad, outB, cropB, ang), plot=plot, expand_px=expand_px)
                 croped_ft.append(out[0])
                 croped_ft_w.append(out[1])
 

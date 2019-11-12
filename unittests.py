@@ -4,19 +4,19 @@
 
 import tensorflow as tf
 import numpy as np
-from synthtext import generator
+# from synthtext import generator
+from icdar import generator
 from config import CHAR_VECTOR
 from model_backbone import Backbone
 from model_detection import Detection
-from model_roirotate import RoIRotate
+from model_roirotate import RoIRotate, tfa_enabled
 from model_recognition import Recognition
 
 # init
-
 input_shape = [640, 640, 3]  # 160 / 480 / 640 / 800
 model_sharedconv = Backbone(backbone='mobilenet', input_shape=input_shape)
 model_detection = Detection()
-model_RoIrotate = RoIRotate()
+model_RoIrotate = RoIRotate(tfa_enabled=tfa_enabled)
 model_recognition = Recognition(num_classes=len(CHAR_VECTOR)+1, training=True, drop_prob=0.05)
 
 # -------- #
