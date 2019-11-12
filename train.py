@@ -113,8 +113,10 @@ for x_batch in data_gen:
         model_detection.save_weights(cpkt_dir + 'detection')
         model_recognition.save_weights(cpkt_dir + 'recognition')
 
-        with open('loss_test.txt', ['a' if load_models else 'w'][0]) as file:
-            [file.write(str(s) + '\n') for s in loss_hist]
+        with open('loss.txt', ['a' if load_models else 'w'][0]) as file:
+            for line in loss_hist:
+                [file.write(str(i) + ' ') for i in line]
+                file.write('\n')
         loss_hist = []
 
 
