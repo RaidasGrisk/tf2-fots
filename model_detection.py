@@ -64,7 +64,7 @@ class Detection(tf.keras.Model):
         return tf.reduce_mean(loss)
     
     @staticmethod
-    def loss_regression(geo_score, geo_score_):
+    def loss_regression(geo_score, geo_score_, f_score, training_mask):
         """
         :param geo_score: ground truth of geometry
         :param geo_score_: prediction of geometry
@@ -81,12 +81,14 @@ class Detection(tf.keras.Model):
         area_union = area_gt + area_pred - area_intersect
         L_AABB = -tf.math.log((area_intersect + 1.0)/(area_union + 1.0))
         L_theta = 1 - tf.cos(theta_pred - theta_gt)
-        L_g = L_AABB + 20 * L_theta  # 10 in paper
+        # L_g = L_AABB + 20 * L_theta  # 10 in paper
+        loss_iou = tf.reduce_mean(L_AABB * f_score * training_mask)
+        loss_angle = tf.reduce_mean(L_theta * 20 * f_score * training_mask)
 
-        return L_g
+        return loss_iou, loss_angle
 
     def loss_detection(self, f_score, f_score_, geo_score, geo_score_, training_mask):
 
         loss_clasification = self.loss_classification2(f_score, f_score_, training_mask)
-        loss_regression = self.loss_regression(geo_score, geo_score_)
-        return tf.reduce_mean(loss_regression * f_score * training_mask) + loss_clasification * 1  #0.01  # 1 in paper?
+        loss_iou, loss_angle = self.loss_regression(geo_score, geo_score_, f_score, training_mask)
+        return loss_iou + loss_angle + loss_clasification

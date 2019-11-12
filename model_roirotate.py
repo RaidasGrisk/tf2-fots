@@ -1,6 +1,17 @@
 import tensorflow as tf
-import tensorflow_addons as tfa
 from utils import quick_plot
+
+try:
+    import tensorflow_addons as tfa
+    tfa_enabled = True
+except ModuleNotFoundError:
+    import cv2
+    import math
+    import numpy as np
+    tfa_enabled = False
+    print('tfa module not available. Will be using cv2 to rotate matrices \n'
+          'Error will not be back-propagated from recognition branch \n'
+          'to backbone branch. This mode is proper for inference only')
 
 
 class RoIRotate(object):
@@ -24,23 +35,46 @@ class RoIRotate(object):
 
     # reshape original image to shape of sharedconvs and roi rotate it to see what are the features
 
-    def __init__(self, features_stride=4):
+    def __init__(self, features_stride=4, tfa_enabled=False):
         # self.features = features
+        self.tfa_enabled = tfa_enabled
         self.features_stride = features_stride
         self.max_RoiWidth = int(256 / features_stride)
         self.fix_RoiHeight = int(32 / features_stride)
         self.ratio = float(self.fix_RoiHeight) / self.max_RoiWidth
 
-    @tf.function()
+    # decorating this with tf.function() throws an error: OSError: could not get source code
+    # not sure why this went wrong as I've been using it with decoration previously
+    # @tf.function()
     def scanFunc(self, state, b_input, plot=False, expand_px=0):
 
         ifeatures, outBox, cropBox, angle = b_input
-        cropFeatures = tf.image.crop_to_bounding_box(ifeatures, outBox[1]-expand_px, outBox[0]-expand_px, outBox[3]+expand_px*2, outBox[2]+expand_px*2)
+        # make sure box size is within image
+        _, height, width, _ = ifeatures.shape
+        offset_height = outBox[1]-expand_px
+        offset_width = outBox[0]-expand_px
+        target_height = outBox[3]+expand_px*2
+        target_width = outBox[2]+expand_px*2
+        target_height = np.clip(outBox[3]+expand_px, 1, height - outBox[1]-expand_px)
+        target_width = np.clip(outBox[2]+expand_px, 1, width - outBox[0]-expand_px)
+
+        cropFeatures = tf.image.crop_to_bounding_box(ifeatures, offset_height, offset_width, target_height, target_width)
         if plot:
             for i in cropFeatures:
                 quick_plot(i.numpy())
 
-        textImgFeatures = tfa.image.rotate(cropFeatures, angles=angle)
+        if self.tfa_enabled:
+            textImgFeatures = tfa.image.rotate(cropFeatures, angles=angle)
+        else:
+            _, h, w, c = cropFeatures.shape
+            center = (w / 2 + expand_px, h / 2 + expand_px)
+            width = cropBox[2] + expand_px * 4
+            height = cropBox[3] + expand_px * 4
+            matrix = cv2.getRotationMatrix2D(center=center, angle=math.degrees(math.atan(angle)), scale=1)  # https://stackoverflow.com/questions/10057854/inverse-of-tan-in-python-tan-1
+            image = cv2.warpAffine(src=cropFeatures.numpy()[0, :, :, :], M=matrix, dsize=(w, h))
+            x = int(center[0] - width / 2)
+            y = int(center[1] - height / 2)
+            textImgFeatures = image[y:y + height, x:x + width, :][np.newaxis, :, :, :]
 
         if plot:
             for i in textImgFeatures.numpy():
@@ -59,7 +93,6 @@ class RoIRotate(object):
 
         # crop rotated corners
         pad_or_crop_textImgFeatures = tf.image.crop_to_bounding_box(resize_textImgFeatures, 0, 0, self.fix_RoiHeight, w)
-        # plot(pad_or_crop_textImgFeatures[0, ::].numpy())
         pad_or_crop_textImgFeatures = tf.image.pad_to_bounding_box(pad_or_crop_textImgFeatures, 0, 0, self.fix_RoiHeight, self.max_RoiWidth)
         if plot:
             for i in pad_or_crop_textImgFeatures:
@@ -101,7 +134,6 @@ class RoIRotate(object):
             croped_ft = []
             croped_ft_w = []
             for outB, cropB, ang in zip(outBoxes, cropBoxes, angles):
-
                 out = self.scanFunc(b_input=(ifeatures_pad, outB, cropB, ang), state=[], plot=plot, expand_px=expand_px)
                 croped_ft.append(out[0])
                 croped_ft_w.append(out[1])
