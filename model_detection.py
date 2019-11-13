@@ -70,20 +70,29 @@ class Detection(tf.keras.Model):
         :param geo_score_: prediction of geometry
         """
 
-        # d1 -> top, d2->right, d3->bottom, d4->left
-        d1_gt, d2_gt, d3_gt, d4_gt, theta_gt = tf.split(value=geo_score, num_or_size_splits=5, axis=3)
-        d1_pred, d2_pred, d3_pred, d4_pred, theta_pred = tf.split(value=geo_score_, num_or_size_splits=5, axis=3)
-        area_gt = (d1_gt + d3_gt) * (d2_gt + d4_gt)
-        area_pred = (d1_pred + d3_pred) * (d2_pred + d4_pred)
-        w_union = tf.minimum(d2_gt, d2_pred) + tf.minimum(d4_gt, d4_pred)
-        h_union = tf.minimum(d1_gt, d1_pred) + tf.minimum(d3_gt, d3_pred)
-        area_intersect = w_union * h_union
-        area_union = area_gt + area_pred - area_intersect
-        L_AABB = -tf.math.log((area_intersect + 1.0)/(area_union + 1.0))
-        L_theta = 1 - tf.cos(theta_pred - theta_gt)
-        # L_g = L_AABB + 20 * L_theta  # 10 in paper
-        loss_iou = tf.reduce_mean(L_AABB * f_score * training_mask)
-        loss_angle = tf.reduce_mean(L_theta * 20 * f_score * training_mask)
+        # -------- #
+        box_params, angle = tf.split(value=geo_score, num_or_size_splits=[4, 1], axis=3)
+        box_params_, angle_ = tf.split(value=geo_score_, num_or_size_splits=[4, 1], axis=3)
+
+        loss_angle = 1 - tf.cos(angle_ - angle)
+        loss_angle = tf.reduce_mean(loss_angle * 20 * f_score * training_mask)
+        loss_iou = tf.reduce_mean(tf.square((box_params - box_params_) * f_score * training_mask))
+        # -------- #
+
+        # # d1 -> top, d2->right, d3->bottom, d4->left
+        # d1_gt, d2_gt, d3_gt, d4_gt, theta_gt = tf.split(value=geo_score, num_or_size_splits=5, axis=3)
+        # d1_pred, d2_pred, d3_pred, d4_pred, theta_pred = tf.split(value=geo_score_, num_or_size_splits=5, axis=3)
+        # area_gt = (d1_gt + d3_gt) * (d2_gt + d4_gt)
+        # area_pred = (d1_pred + d3_pred) * (d2_pred + d4_pred)
+        # w_union = tf.minimum(d2_gt, d2_pred) + tf.minimum(d4_gt, d4_pred)
+        # h_union = tf.minimum(d1_gt, d1_pred) + tf.minimum(d3_gt, d3_pred)
+        # area_intersect = w_union * h_union
+        # area_union = area_gt + area_pred - area_intersect
+        # L_AABB = -tf.math.log((area_intersect + 1.0)/(area_union + 1.0))
+        # L_theta = 1 - tf.cos(theta_pred - theta_gt)
+        # # L_g = L_AABB + 20 * L_theta  # 10 in paper
+        # loss_iou = tf.reduce_mean(L_AABB * f_score * training_mask)
+        # loss_angle = tf.reduce_mean(L_theta * 20 * f_score * training_mask)
 
         return loss_iou, loss_angle
 
