@@ -52,8 +52,8 @@ class RoIRotate(object):
         ifeatures, outBox, cropBox, angle = b_input
         # make sure box size is within image
         _, height, width, _ = ifeatures.shape
-        offset_height = outBox[1]-expand_px
-        offset_width = outBox[0]-expand_px
+        offset_height = tf.clip_by_value(outBox[1]-expand_px, 1, height)
+        offset_width = tf.clip_by_value(outBox[0]-expand_px, 1, width)
         target_height = tf.clip_by_value(outBox[3]+expand_px, 1, height - outBox[1]-expand_px)
         target_width = tf.clip_by_value(outBox[2]+expand_px, 1, width - outBox[0]-expand_px)
 
