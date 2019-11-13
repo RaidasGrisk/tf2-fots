@@ -76,7 +76,7 @@ class RoIRotate(object):
             textImgFeatures = image[y:y + height, x:x + width, :][np.newaxis, :, :, :]
 
         if plot:
-            for i in [textImgFeatures.numpy() if self.tfa_enabled else textImgFeatures][0]
+            for i in [textImgFeatures.numpy() if self.tfa_enabled else textImgFeatures][0]:
                 quick_plot(i)
 
         # ------------- #
