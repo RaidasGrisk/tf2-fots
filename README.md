@@ -3,7 +3,7 @@
 I no longer work on this project.  
 To sum things up, in order for this to work better:
 1. Use bigger model, MobileNet does not seem to suffice.
-2. Better training data, with different text angle, size and length.
+2. Better training data, with more varied text angles, sizes and lengths.
 3. Clever loss functions and combinations of losses of different model branches.
 
 Okay, here's a gif showing the current state of the model.   
