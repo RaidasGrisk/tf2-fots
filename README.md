@@ -9,7 +9,7 @@ To sum things up, in order for this to work better:
 Okay, here's a gif showing the current state of the model.   
 It ain't much but it's honest work ¯\\\_(ツ)\_/¯
 
-![Gif](misc/gif.gif?raw=true)
+![Gif](misc/gif1.gif?raw=true)
 
 In progress. Current state:
 
